@@ -27,7 +27,7 @@
 | 기기 간 통신 | MultipeerConnectivity (로컬 네트워크 P2P) |
 | 오디오 합성 | AVAudioEngine + AVAudioUnitSampler (SoundFont 기반) |
 | 햅틱 피드백 | Core Haptics |
-| 접근성 | VoiceOver, 햅틱 |
+| 접근성 | Voice Control, 햅틱 |
 | 최소 지원 | iOS 18+ / Xcode 26 |
 
 ## 아키텍처 핵심 결정
