@@ -6,6 +6,7 @@ final class AppState: ObservableObject {
     @Published var deviceRole: DeviceRole
     @Published var selectedChord: GuitarChord?
     @Published var receivedChord: GuitarChord?
+    @Published var receivedFrets: [Int] = Array(repeating: 0, count: GuitarFingering.stringCount)
     @Published var lastStrumDirection: StrumDirection?
     @Published var connectionState: PeerConnectionState = .idle
     @Published var discoveredPeerNames: [String] = []
@@ -52,6 +53,11 @@ final class AppState: ObservableObject {
             receivedChord = message.chord
         case .fingerNumber:
             break
+        case .fingering:
+            if let frets = message.frets {
+                receivedFrets = GuitarFingering(frets: frets).frets
+            }
+            receivedChord = message.chord
         }
     }
 }

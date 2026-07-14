@@ -13,7 +13,9 @@ final class ScreenshotPrototypeViewModel: ObservableObject {
     @Published var isControlBarExpanded = true
     @Published var peerButtonState: PrototypePeerButtonState = .disconnected
     @Published var selectedFingerNumber: Int?
+    @Published var selectedFingeringChord: GuitarChord?
     @Published var receivedFingerNumber: Int?
+    @Published var receivedFrets: [Int] = Array(repeating: 0, count: GuitarFingering.stringCount)
 
     init(multipeerService: MultipeerServiceProtocol = MultipeerService()) {
         self.multipeerService = multipeerService
@@ -28,8 +30,17 @@ final class ScreenshotPrototypeViewModel: ObservableObject {
             self?.peerButtonState = peers.isEmpty ? .connecting : .connected
         }
         self.multipeerService.onMessageReceived = { [weak self] message, _ in
-            guard message.type == .fingerNumber else { return }
-            self?.receivedFingerNumber = message.number
+            switch message.type {
+            case .fingerNumber:
+                self?.receivedFingerNumber = message.number
+            case .fingering:
+                if let frets = message.frets {
+                    self?.receivedFrets = GuitarFingering(frets: frets).frets
+                }
+                self?.selectedFingeringChord = message.chord
+            default:
+                return
+            }
         }
     }
 
@@ -89,5 +100,13 @@ final class ScreenshotPrototypeViewModel: ObservableObject {
     func selectFingerNumber(_ number: Int) {
         selectedFingerNumber = number
         multipeerService.send(.fingerNumber(number))
+    }
+
+    func selectFingeringChord(_ chord: GuitarChord) {
+        selectedFingerNumber = nil
+        selectedFingeringChord = chord
+        let fingering = chord.fingering
+        receivedFrets = fingering.frets
+        multipeerService.send(.fingering(fingering.frets, chord: chord))
     }
 }

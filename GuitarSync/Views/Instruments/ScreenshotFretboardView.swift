@@ -3,8 +3,8 @@ import SwiftUI
 struct ScreenshotFretboardView: View {
     private let stringYs: [CGFloat] = [100, 156, 212, 266, 320, 372]
     private let fretXs: [CGFloat] = [16, 148, 306, 474, 650, 832]
-    let selectedFingerNumber: Int?
-    let onFingerTap: (Int) -> Void
+    let selectedChord: GuitarChord?
+    let onChordTap: (GuitarChord) -> Void
 
     var body: some View {
         GeometryReader { proxy in
@@ -39,19 +39,19 @@ struct ScreenshotFretboardView: View {
                     .overlay(Circle().stroke(Color(red: 0.46, green: 0.53, blue: 0.62), lineWidth: 2))
                     .position(x: 390, y: 238)
 
-                ForEach(fingerMarkers) { marker in
+                ForEach(chordMarkers) { marker in
                     Button {
-                        onFingerTap(marker.number)
+                        onChordTap(marker.chord)
                     } label: {
-                        Text("\(marker.number)")
-                            .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(marker.number == selectedFingerNumber ? .black : .white)
-                            .frame(width: 34, height: 34)
+                        Text(marker.chord.rawValue)
+                            .font(.system(size: marker.chord.rawValue.count > 1 ? 15 : 17, weight: .bold))
+                            .foregroundStyle(marker.chord == selectedChord ? .black : .white)
+                            .frame(width: 42, height: 34)
                             .background(
-                                Circle()
-                                    .fill(marker.number == selectedFingerNumber ? Color.white : Color.black.opacity(0.72))
+                                Capsule()
+                                    .fill(marker.chord == selectedChord ? Color.white : Color.black.opacity(0.72))
                             )
-                            .overlay(Circle().stroke(Color.white.opacity(0.86), lineWidth: 2))
+                            .overlay(Capsule().stroke(Color.white.opacity(0.86), lineWidth: 2))
                     }
                     .buttonStyle(.plain)
                     .position(marker.position)
@@ -65,19 +65,19 @@ struct ScreenshotFretboardView: View {
         }
     }
 
-    private var fingerMarkers: [FingerMarker] {
+    private var chordMarkers: [ChordMarker] {
         [
-            FingerMarker(number: 1, position: CGPoint(x: 214, y: 156)),
-            FingerMarker(number: 2, position: CGPoint(x: 306, y: 212)),
-            FingerMarker(number: 3, position: CGPoint(x: 474, y: 266)),
-            FingerMarker(number: 4, position: CGPoint(x: 650, y: 320))
+            ChordMarker(chord: .c, position: CGPoint(x: 214, y: 156)),
+            ChordMarker(chord: .g, position: CGPoint(x: 306, y: 212)),
+            ChordMarker(chord: .d, position: CGPoint(x: 474, y: 266)),
+            ChordMarker(chord: .am, position: CGPoint(x: 650, y: 320))
         ]
     }
 }
 
-private struct FingerMarker: Identifiable {
-    let number: Int
+private struct ChordMarker: Identifiable {
+    let chord: GuitarChord
     let position: CGPoint
 
-    var id: Int { number }
+    var id: GuitarChord { chord }
 }
