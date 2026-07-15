@@ -1,84 +1,62 @@
 import AVFoundation
-import AudioToolbox
 import Foundation
 
-#if USE_AUDIOKIT && canImport(AudioKit)
-import AudioKit
-#endif
-
+/// 두 오디오 엔진(`NativeAudioEngine`, `AudioKitAudioEngine`)이 공유하는 공통 로직.
+///
+/// 음 계산·벨로시티·자동 정지 스케줄링처럼 오디오 프레임워크와 무관한 부분을 여기에 모으고,
+/// 실제 소리를 내는 부분(`playNote`/`stopNote`)과 엔진 수명주기(`setupEngine`/`performStart`/
+/// `performStop`)만 서브클래스가 오버라이드한다. (Template Method 패턴)
 @MainActor
-final class GuitarAudioEngine {
-    private let openStringMIDINotes = [40, 45, 50, 55, 59, 64]
-    private let noteDuration: TimeInterval = 3.6
-    private let releaseTimeControl: UInt8 = 72
-    private let releaseTimeValue: UInt8 = 78
+class GuitarAudioEngineBase {
+    let openStringMIDINotes = [40, 45, 50, 55, 59, 64]
+    let noteDuration: TimeInterval = 3.6
+    let releaseTimeControl: UInt8 = 72
+    let releaseTimeValue: UInt8 = 78
+
     private var lastPlayedNotes = Array<Int?>(repeating: nil, count: GuitarFingering.stringCount)
     private var scheduledStopWorkItems = Array<DispatchWorkItem?>(repeating: nil, count: GuitarFingering.stringCount)
-    private var isSetUp = false
+    var isSetUp = false
 
-    #if USE_AUDIOKIT && canImport(AudioKit)
-    private let engine = AudioEngine()
-    private let samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
-    private lazy var mixer = Mixer(samplers.map { $0 as Node })
-    #else
-    private let engine = AVAudioEngine()
-    private let mixer = AVAudioMixerNode()
-    private let reverb = AVAudioUnitReverb()
-    private let samplers = (0..<GuitarFingering.stringCount).map { _ in AVAudioUnitSampler() }
-    #endif
-
-    init() {
-        setupEngine()
-    }
-
-    func setupEngine() {
-        guard !isSetUp else { return }
-        configureAudioSession()
-
-        #if USE_AUDIOKIT && canImport(AudioKit)
-        engine.output = mixer
-        #else
-        engine.attach(mixer)
-        engine.attach(reverb)
-        configureReverb()
-
-        for sampler in samplers {
-            engine.attach(sampler)
-            engine.connect(sampler, to: mixer, format: nil)
-        }
-        engine.connect(mixer, to: reverb, format: nil)
-        engine.connect(reverb, to: engine.mainMixerNode, format: nil)
-        #endif
-
-        loadSoundFont()
-        isSetUp = true
-    }
+    // MARK: - Lifecycle
 
     func start() {
         setupEngine()
-
-        do {
-            #if USE_AUDIOKIT && canImport(AudioKit)
-            try engine.start()
-            #else
-            if !engine.isRunning {
-                try engine.start()
-            }
-            #endif
-        } catch {
-            logAudioError("Failed to start guitar audio engine: \(error.localizedDescription)")
-        }
+        performStart()
     }
 
     func stop() {
         stopAllStrings()
-
-        #if USE_AUDIOKIT && canImport(AudioKit)
-        engine.stop()
-        #else
-        engine.stop()
-        #endif
+        performStop()
     }
+
+    // MARK: - Subclass hooks
+
+    /// 엔진 노드 연결 및 사운드폰트 로딩. 서브클래스에서 반드시 오버라이드한다.
+    func setupEngine() {
+        fatalError("Subclasses must override setupEngine()")
+    }
+
+    /// 실제 오디오 엔진을 구동한다. 서브클래스에서 반드시 오버라이드한다.
+    func performStart() {
+        fatalError("Subclasses must override performStart()")
+    }
+
+    /// 실제 오디오 엔진을 정지한다. 서브클래스에서 반드시 오버라이드한다.
+    func performStop() {
+        fatalError("Subclasses must override performStop()")
+    }
+
+    /// 지정한 현의 샘플러로 노트를 재생한다. 서브클래스에서 반드시 오버라이드한다.
+    func playNote(stringIndex: Int, note: Int, velocity: UInt8) {
+        fatalError("Subclasses must override playNote(stringIndex:note:velocity:)")
+    }
+
+    /// 지정한 현의 샘플러에서 노트를 멈춘다. 서브클래스에서 반드시 오버라이드한다.
+    func stopNote(stringIndex: Int, note: Int) {
+        fatalError("Subclasses must override stopNote(stringIndex:note:)")
+    }
+
+    // MARK: - Note helpers
 
     func noteNumber(stringIndex: Int, fret: Int) -> Int? {
         guard openStringMIDINotes.indices.contains(stringIndex), (0...24).contains(fret) else {
@@ -88,25 +66,14 @@ final class GuitarAudioEngine {
         return openStringMIDINotes[stringIndex] + fret
     }
 
+    // MARK: - Playback
+
     func pluckString(stringIndex: Int, fretNumber: Int, velocity: UInt8 = 96) {
-        guard samplers.indices.contains(stringIndex), fretNumber >= 0 else { return }
+        guard (0..<GuitarFingering.stringCount).contains(stringIndex), fretNumber >= 0 else { return }
         guard let note = noteNumber(stringIndex: stringIndex, fret: fretNumber) else { return }
 
         stopString(stringIndex: stringIndex, cancelScheduledStop: true)
-
-        #if USE_AUDIOKIT && canImport(AudioKit)
-        samplers[stringIndex].play(
-            noteNumber: MIDINoteNumber(note),
-            velocity: MIDIVelocity(velocity),
-            channel: 0
-        )
-        #else
-        samplers[stringIndex].startNote(
-            UInt8(note),
-            withVelocity: velocity,
-            onChannel: 0
-        )
-        #endif
+        playNote(stringIndex: stringIndex, note: note, velocity: velocity)
 
         lastPlayedNotes[stringIndex] = note
         scheduleStop(stringIndex: stringIndex, after: noteDuration)
@@ -166,7 +133,7 @@ final class GuitarAudioEngine {
     }
 
     private func stopString(stringIndex: Int, cancelScheduledStop: Bool) {
-        guard samplers.indices.contains(stringIndex),
+        guard (0..<GuitarFingering.stringCount).contains(stringIndex),
               lastPlayedNotes.indices.contains(stringIndex)
         else {
             return
@@ -179,11 +146,7 @@ final class GuitarAudioEngine {
 
         guard let note = lastPlayedNotes[stringIndex] else { return }
 
-        #if USE_AUDIOKIT && canImport(AudioKit)
-        samplers[stringIndex].stop(noteNumber: MIDINoteNumber(note), channel: 0)
-        #else
-        samplers[stringIndex].stopNote(UInt8(note), onChannel: 0)
-        #endif
+        stopNote(stringIndex: stringIndex, note: note)
 
         lastPlayedNotes[stringIndex] = nil
     }
@@ -211,7 +174,9 @@ final class GuitarAudioEngine {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
-    private func configureAudioSession() {
+    // MARK: - Shared configuration
+
+    func configureAudioSession() {
         #if os(iOS)
         do {
             let session = AVAudioSession.sharedInstance()
@@ -223,62 +188,6 @@ final class GuitarAudioEngine {
         }
         #endif
     }
-
-    #if USE_AUDIOKIT && canImport(AudioKit)
-    #else
-    private func configureReverb() {
-        reverb.loadFactoryPreset(.mediumRoom)
-        reverb.wetDryMix = 14
-    }
-    #endif
-
-    private func loadSoundFont() {
-        guard let soundFontURL = Bundle.main.url(forResource: "AcousticGuitar", withExtension: "sf2") else {
-            logAudioError("AcousticGuitar.sf2 was not found in the app bundle.")
-            return
-        }
-
-        for sampler in samplers {
-            do {
-                #if USE_AUDIOKIT && canImport(AudioKit)
-                try sampler.samplerUnit.loadSoundBankInstrument(
-                    at: soundFontURL,
-                    program: 0,
-                    bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
-                    bankLSB: 0
-                )
-                #else
-                try sampler.loadSoundBankInstrument(
-                    at: soundFontURL,
-                    program: 0,
-                    bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
-                    bankLSB: 0
-                )
-                #endif
-                configureSamplerExpression(sampler)
-            } catch {
-                logAudioError("Failed to load AcousticGuitar.sf2: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    #if USE_AUDIOKIT && canImport(AudioKit)
-    private func configureSamplerExpression(_ sampler: AppleSampler) {
-        sampler.samplerUnit.sendController(
-            releaseTimeControl,
-            withValue: releaseTimeValue,
-            onChannel: 0
-        )
-    }
-    #else
-    private func configureSamplerExpression(_ sampler: AVAudioUnitSampler) {
-        sampler.sendController(
-            releaseTimeControl,
-            withValue: releaseTimeValue,
-            onChannel: 0
-        )
-    }
-    #endif
 
     private func sequenceVelocity(baseVelocity: UInt8, stringIndex: Int, offset: Int) -> UInt8 {
         let textureByString = [3, 1, 2, -1, 0, -2]
@@ -292,7 +201,7 @@ final class GuitarAudioEngine {
         UInt8(min(max(value, 42), 124))
     }
 
-    private func logAudioError(_ message: String) {
+    func logAudioError(_ message: String) {
         #if DEBUG
         print("[GuitarAudioEngine] \(message)")
         #endif

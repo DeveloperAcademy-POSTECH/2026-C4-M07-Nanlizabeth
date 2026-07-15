@@ -10,7 +10,7 @@ final class GuitarStrumViewModel: ObservableObject {
     @Published var debugOverlayEnabled: Bool
     @Published private(set) var debugState = GuitarStrumDebugState()
 
-    private let audioEngine: GuitarAudioEngine
+    private var audioEngine: GuitarAudioEngineProtocol
     private var startAxisValue: CGFloat?
     private var previousAxisValue: CGFloat?
     private var previousInputTime: TimeInterval?
@@ -21,7 +21,7 @@ final class GuitarStrumViewModel: ObservableObject {
         self.layoutConfiguration = StrumLayoutConfiguration()
         self.directionMapping = StrumDirectionMapping()
         self.debugOverlayEnabled = false
-        self.audioEngine = GuitarAudioEngine()
+        self.audioEngine = GuitarAudioEngineFactory.makeDefault()
     }
 
     init(
@@ -33,7 +33,7 @@ final class GuitarStrumViewModel: ObservableObject {
         self.layoutConfiguration = layoutConfiguration
         self.directionMapping = directionMapping
         self.debugOverlayEnabled = debugOverlayEnabled
-        self.audioEngine = GuitarAudioEngine()
+        self.audioEngine = GuitarAudioEngineFactory.makeDefault()
     }
 
     init(
@@ -41,7 +41,7 @@ final class GuitarStrumViewModel: ObservableObject {
         layoutConfiguration: StrumLayoutConfiguration,
         directionMapping: StrumDirectionMapping,
         debugOverlayEnabled: Bool,
-        audioEngine: GuitarAudioEngine
+        audioEngine: GuitarAudioEngineProtocol
     ) {
         self.currentFingering = currentFingering
         self.layoutConfiguration = layoutConfiguration
@@ -56,6 +56,13 @@ final class GuitarStrumViewModel: ObservableObject {
 
     func stopAudio() {
         audioEngine.stop()
+    }
+
+    /// 런타임에 오디오 엔진을 교체한다. (예: AudioKit ↔ 네이티브 A/B 비교용 토글)
+    func switchAudioEngine(to engine: GuitarAudioEngineProtocol) {
+        audioEngine.stop()
+        audioEngine = engine
+        audioEngine.start()
     }
 
     func updateFingering(_ frets: [Int]) {
