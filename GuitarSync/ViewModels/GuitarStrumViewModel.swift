@@ -9,6 +9,7 @@ final class GuitarStrumViewModel: ObservableObject {
     @Published var directionMapping: StrumDirectionMapping
     @Published var debugOverlayEnabled: Bool
     @Published private(set) var debugState = GuitarStrumDebugState()
+    @Published private(set) var audioEngineKind: AudioEngineKind = GuitarAudioEngineFactory.defaultKind
 
     private var audioEngine: GuitarAudioEngineProtocol
     private var startAxisValue: CGFloat?
@@ -58,10 +59,18 @@ final class GuitarStrumViewModel: ObservableObject {
         audioEngine.stop()
     }
 
-    /// 런타임에 오디오 엔진을 교체한다. (예: AudioKit ↔ 네이티브 A/B 비교용 토글)
-    func switchAudioEngine(to engine: GuitarAudioEngineProtocol) {
+    /// 런타임에 두 엔진을 번갈아 교체한다. (A/B 비교용, 주로 디버그 빌드에서 사용)
+    func toggleAudioEngine() {
+        let next: AudioEngineKind = audioEngineKind == .native ? .audioKit : .native
+        switchAudioEngine(to: next)
+    }
+
+    /// 런타임에 지정한 종류의 엔진으로 교체한다. 재빌드 없이 즉시 반영된다.
+    func switchAudioEngine(to kind: AudioEngineKind) {
+        guard kind != audioEngineKind else { return }
         audioEngine.stop()
-        audioEngine = engine
+        audioEngine = GuitarAudioEngineFactory.make(kind)
+        audioEngineKind = kind
         audioEngine.start()
     }
 

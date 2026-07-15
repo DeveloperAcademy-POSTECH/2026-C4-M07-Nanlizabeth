@@ -30,6 +30,15 @@ struct MainInstrumentScreen: View {
                     .padding(.top, 88)
                     .padding(.trailing, 162)
             }
+
+            #if DEBUG
+            if viewModel.mode == .strum {
+                DebugAudioEngineToggle(viewModel: strumViewModel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .padding(.leading, 20)
+                    .padding(.bottom, 20)
+            }
+            #endif
         }
     }
 
