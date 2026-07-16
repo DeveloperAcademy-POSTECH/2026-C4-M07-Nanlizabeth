@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainInstrumentScreen: View {
     @ObservedObject var viewModel: ScreenshotPrototypeViewModel
+    @StateObject private var strumViewModel = GuitarStrumViewModel()
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -29,6 +30,15 @@ struct MainInstrumentScreen: View {
                     .padding(.top, 88)
                     .padding(.trailing, 162)
             }
+
+            #if DEBUG
+            if viewModel.mode == .strum {
+                DebugAudioEngineToggle(viewModel: strumViewModel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .padding(.leading, 20)
+                    .padding(.bottom, 20)
+            }
+            #endif
         }
     }
 
@@ -37,13 +47,19 @@ struct MainInstrumentScreen: View {
         switch viewModel.mode {
         case .chord:
             ScreenshotFretboardView(
-                selectedFingerNumber: viewModel.selectedFingerNumber,
-                onFingerTap: viewModel.selectFingerNumber(_:)
+                selectedChord: viewModel.selectedFingeringChord,
+                onChordTap: viewModel.selectFingeringChord(_:)
             )
                 .ignoresSafeArea()
         case .strum:
-            ScreenshotSoundHoleView(receivedFingerNumber: viewModel.receivedFingerNumber)
+            GuitarStrumView(viewModel: strumViewModel)
                 .ignoresSafeArea()
+                .onAppear {
+                    strumViewModel.updateFingering(viewModel.receivedFrets)
+                }
+                .onChange(of: viewModel.receivedFrets) { _, frets in
+                    strumViewModel.updateFingering(frets)
+                }
         }
     }
 }
