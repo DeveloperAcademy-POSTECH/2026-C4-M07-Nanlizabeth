@@ -1,0 +1,356 @@
+# 🏗️ 기타싱크 설계 문서 (ARCHITECTURE) — "어떻게" 만드나
+
+> **문서 3형제:** [SPEC.md](SPEC.md)(무엇을) · [ARCHITECTURE.md](ARCHITECTURE.md)(어떻게) · [ROADMAP.md](ROADMAP.md)(무슨 순서로)
+> 여기엔 ①현재 어디까지 됐나 ②목표 폴더 구조 ③**공통 인터페이스(계약) 카탈로그** ④병렬 개발 방법이 있습니다.
+
+**초보자를 위한 읽는 법:** 전부 읽을 필요 없어요. ROADMAP에서 자기 태스크를 확인하면 그 태스크에 "관련 계약: §3.x"가 적혀 있습니다. **그 절만 읽으면 됩니다.** 계약 = "이런 이름의 기능이 이렇게 들어오고 나온다"는 껍데기 약속. 껍데기만 지키면 남의 코드를 몰라도 내 것과 맞물립니다.
+
+---
+
+## 1. 현재 구현 현황 (2026-07-17 기준)
+
+### ✅ 이미 있는 것
+
+| 영역 | 파일 | 상태 |
+|------|------|------|
+| 소리 엔진 계약 | `Services/Audio/GuitarAudioEngineProtocol.swift` | ✅ 두 엔진의 공통 껍데기 |
+| 소리 엔진 공통 로직 | `Services/Audio/GuitarAudioEngineBase.swift` | ✅ 음 계산·벨로시티·자동 정지 |
+| Native 엔진 | `Services/Audio/NativeAudioEngine.swift` | ✅ AVAudioEngine + 샘플러 6개 + 리버브 |
+| AudioKit 엔진 | `Services/Audio/AudioKitAudioEngine.swift` | ✅ 패키지 없어도 컴파일되게 가드됨 |
+| 엔진 팩토리 + A/B 토글 | `GuitarAudioEngineFactory.swift`, `DebugAudioEngineToggle.swift` | ✅ 재빌드 없이 런타임 교체 |
+| 스트럼 입력 계산 | `ViewModels/GuitarStrumViewModel.swift` | ✅ 좌표→줄 매핑, 긁는 속도→세기(velocity) |
+| 통신 | `Services/Multipeer/` (서비스·코덱·메시지) | ✅ 운지(`.fingering`) 전송까지 실동작 |
+| 코드 데이터 | `Models/GuitarChord.swift`(7개) + `GuitarFingering.swift` | 🟡 카탈로그로 확장 필요 |
+| 화면 4종 | `Views/Screens/` | 🟡 와이어프레임(더미 데이터) |
+| Mock 예시 | `Services/Sound/MockSoundPreviewService.swift` | ✅ **우리 프로젝트의 Mock 패턴 표본** |
+| 통신 권한 문구 | `Config/Info.plist` (로컬네트워크·Bonjour·블루투스) | ✅ 이미 등록됨 |
+
+### ⛔ 없는 것 (이제 만들 것)
+
+박자 클럭 · 스트럼 패턴 모델/플레이어 · 코드진행 모델/플레이어 · 운지 상태 관리(멀티터치 개별 발음) · 소스/코디네이터(모드 조립) · 라우터 · 온보딩 · 디자인 토큰 · 미리듣기 플레이어 · `gs_instruments.dls` · 줄 애니메이션 · 성능 계측 도구 · **지연(latency) 측정 · 오디오 중단 대응 · 햅틱 연결 · 음성 명령(연주 중 프리셋 전환)**
+
+---
+
+## 2. 목표 폴더 구조
+
+**폴더를 고르는 규칙 다섯 줄 (이것만 기억):**
+1. 화면 없이 돌아가는 규칙(로직) → `Domain/`
+2. 눈에 보이는 화면 → `Features/` (화면마다 폴더 하나: View + ViewModel 셋트)
+3. 기기·시스템 연동(통신·햅틱·로그) → `Services/`
+4. 프리셋 데이터(운지표·리듬·코드진행 — 코드가 아니라 **데이터**) → `Content/`
+5. 색·여백·공용 부품 → `DesignSystem/`
+
+```
+GuitarSync/
+├── App/                          # 진입점 + 화면 길안내
+│   ├── GuitarSyncApp.swift
+│   ├── RootView.swift
+│   └── AppRouter.swift              [새로] §3.9
+│
+├── DesignSystem/
+│   ├── Tokens/                      [새로] Colors·Spacing·Typography·Radius (Figma 값)
+│   └── Components/                  (기존 LiquidGlass 버튼 등 + 새 공용 부품)
+│
+├── Domain/                          [새 폴더] ★화면 없이 돌아가는 비즈니스 로직
+│   ├── Audio/                       (Services/Audio 전체 이동 — 내용 그대로)
+│   ├── Clock/                       BeatClock (박자 심장) §3.2
+│   ├── Fingering/                   FingeringState·ChordCatalog·FretPress §3.3~3.4
+│   ├── Strum/                       StrumPattern·Library·Player §3.5
+│   ├── Progression/                 ChordProgression·Library·Player·Preview §3.6
+│   └── Session/                     소스 2종 + PlaySessionCoordinator + PlayMode §3.7
+│
+├── Content/                         [새 폴더] 프리셋 데이터 (리서치 결과가 들어오는 곳)
+│   ├── ChordCatalogData.swift          코드 운지표 (C, Am, F, G7 …)
+│   ├── StrumPresetData.swift           주법 프리셋 (칼립소, 고고 …)
+│   └── ProgressionPresetData.swift     진행 프리셋 (머니코드, 캐논 …)
+│
+├── Features/                        화면 단위 (기존 Views/·ViewModels/ 재편)
+│   ├── Onboarding/                  [새로]
+│   ├── Neck/                        기타넥(운지) — 기존 Fretboard 뷰 이동
+│   ├── Strum/                       스트로크 연주 — 기존 GuitarStrumView 이동
+│   ├── StrokeSelect/                기존 StrumSelectScreen 이동
+│   ├── ProgressionSelect/           기존 ChordProgressionScreen 이동
+│   ├── ProgressionCustom/           [새로]
+│   └── PeerConnect/                 [새로] 가이드 + 근처 기기 찾기
+│
+├── Services/                        시스템 연동 (Audio는 Domain으로 이사)
+│   ├── Multipeer/  Haptics/  Device/  Logging/
+│
+├── Models/                          공용 순수 모델 (StrumDirection, 좌표 규약 등)
+└── Resources/                       gs_instruments.dls (예정), 이미지 등
+```
+
+> 📦 **기존 파일 이사는 초기에 딱 1회, 한 사람이** 합니다 (ROADMAP 태스크 F4, 30분짜리). 각자 이사하면 충돌 납니다. 이사 후에는 위 규칙대로만 새 파일을 만드세요.
+
+---
+
+## 3. 공통 계약 카탈로그 ★이 문서의 심장
+
+각 계약마다: **책임 한 줄 → 주요 기능 명세 → 만드는 사람/쓰는 사람 → 쉬운 설명** 순서입니다.
+(메서드 이름은 확정 제안입니다. 계약 담당자가 구현하며 다듬되, **바꾸면 반드시 팀 공지 + 이 문서 수정**.)
+
+### 3.1 `GuitarAudioEngineProtocol` (✅ 있음) — Domain/Audio
+
+**책임:** "소리 내라/멈춰라" 명령의 공통 껍데기. Native와 AudioKit 둘 다 이걸 구현.
+
+| 기능 | 명세 |
+|------|------|
+| `start()` / `stop()` | 엔진 켜기/끄기 |
+| `pluckString(stringIndex:fretNumber:velocity:)` | 한 줄 튕기기 (몇 번 줄, 몇 프렛, 세기 0~127) |
+| `pluckStringSequence(_:frets:baseVelocity:interval:)` | 여러 줄을 시차 두고 차례로 |
+| `strum(frets:direction:velocity:interval:)` | 6줄 전체를 방향대로 긁기 |
+| `stopString(stringIndex:)` / `stopAllStrings()` | 줄 소리 멈춤 |
+
+- **만드는 사람:** 소리 담당(이미 완성) · **쓰는 사람:** 소리가 나는 모든 로직(플레이어·운지 상태)
+- ⏳ **어느 엔진을 쓸지는 출시 직전까지 결정하지 않습니다** — 그동안 둘 다 계약 뒤에 살려두고 성능 데이터만 쌓습니다 ([ROADMAP §2](ROADMAP.md)).
+- 🗣️ *쉬운 설명: 앰프에 꽂는 잭. 잭 규격(계약)만 같으면 앰프(엔진)가 뭐든 소리가 난다.*
+
+> ⚠️ **악기 앱이라 반드시 챙겨야 하는데 초안에 빠졌던 책임 (검토로 추가):**
+> - **지연(latency)** — 터치→소리가 체감상 즉각이어야 한다. **악기 앱의 1순위 지표**(메모리·발열보다 위). `setPreferredIOBufferDuration`은 5ms로 잡혀 있으나 **실제 체감 지연을 측정**해야 한다 → ROADMAP A2. 엔진 최종 선택 기준에도 **지연을 포함**한다.
+> - **중단·경로 변경 대응** — 전화·알람·Siri·이어폰 꽂고 뺌·블루투스 전환 시 `AVAudioSession` 알림을 받아 엔진을 되살려야 한다. 안 하면 **실사용 중 소리가 조용히 죽는다**(가장 흔한 오디오 버그) → ROADMAP A4.
+> - **폴리포니 상한** — 6현 + 잔향이 겹치면 보이스가 폭증한다. 동시 발음 상한·오래된 보이스 회수 정책을 둔다.
+
+### 3.2 `BeatClockProtocol` [새로] — Domain/Clock
+
+**책임:** BPM에 맞춰 "지금 몇 마디, 몇 박, 몇 번째 16분음표"를 계속 방송하는 박자 심장. **자동 스트럼·자동 코드진행·미리듣기·(카운트인)이 전부 이 하나에 맞춰 움직인다.**
+
+| 기능 | 명세 |
+|------|------|
+| `start(bpm:timeSignature:)` | 시작. `TimeSignature`는 `(beatsPerBar: 4, noteValue: 4)` 같은 박자표 |
+| `stop()` | 정지 |
+| 박 이벤트 구독 | `BeatEvent { barIndex, beatIndex, subIndex }` 를 16분음표 단위로 방송 (Combine Publisher 또는 콜백) |
+| `isRunning` / `currentBPM` | 상태 노출 (`@Published`) |
+
+- **만드는 사람:** 로직 담당 1명 · **쓰는 사람:** StrumPatternPlayer, ProgressionPlayer, PreviewPlayer
+- ⚠️ 구현 주의: `Timer`는 밀립니다(드리프트). 최소 `DispatchSourceTimer` + 시작 시각 기준 절대 계산으로 만들 것. **음악적으로 더 촘촘한 정확도가 필요하면** 오디오 엔진 자체 클럭(샘플 단위 스케줄링, `AVAudioTime`/시퀀서)이 정석 — UI 타이머가 충분히 안 촘촘하면 이쪽으로 갈지 **결정 필요**(기술 리스크).
+- 🗣️ *쉬운 설명: 메트로놈 라디오 방송국. 누구든 주파수만 맞추면(구독) 같은 박자를 듣는다.*
+
+### 3.3 `ChordCatalog` (확장) — Domain/Fingering
+
+**책임:** "코드 이름 → 운지(어느 줄 몇 프렛)"의 **전사 공용 사전.** 프리셋 진행·커스텀 진행·기타넥 표시가 **전부 이 하나만** 본다. (→ "커스텀에서 프리셋 코드를 재사용"이 저절로 됨)
+
+| 기능 | 명세 |
+|------|------|
+| `GuitarChord` 확장 | 기존 7개 → C7·Cm·CM7·Dm7·F·B7 등 추가 (목록은 콘텐츠 태스크 CT3에서 확정) |
+| `fingering(for: GuitarChord) -> GuitarFingering` | 운지 조회 (기존 `chord.fingering` 확장) |
+| `allChords` / `chords(root:)` | 전체 목록·근음별 필터 (선택 화면용) |
+
+- **만드는 사람:** 계약은 로직 담당, **데이터 채우기는 리서치 담당**(코드 몰라도 운지표만 채우면 됨 → `Content/ChordCatalogData.swift`)
+- **규약(전 팀 공통, SPEC §4와 동일):** `stringIndex 0 = 6번줄(저음E)`, `frets: -1=뮤트 / 0=개방 / 1~=프렛`
+- 🗣️ *쉬운 설명: 기타 코드 사전책. 모두가 같은 책을 봐야 "C코드"가 사람마다 다르지 않다.*
+
+### 3.4 `FretboardInput` ↔ `FingeringState` [새로] — Domain/Fingering ★개별 발음 베스트 프랙티스
+
+**책임:** 기타넥 터치를 받아 ①현재 운지 상태를 관리하고 ②정책에 따라 그 줄을 즉시 발음시키고 ③UI가 그릴 이벤트를 되돌려준다. **SPEC §4(핑거보드 개별 발음)의 해답.**
+
+**데이터 흐름 (이 그림이 곧 인터페이스):**
+
+```
+[UI: 넥 화면]                          [Domain: FingeringState]                [Audio]
+터치 감지                                                                     
+  → FretPress(stringIndex, fret)로 변환  
+  → pressesChanged(Set<FretPress>) 호출 → 운지 상태 갱신                        
+                                        → 정책이 pluckOnPress면              
+                                          새로 눌린 줄마다 ──────────────────→ pluckString(...)
+                                        → notePlayed(stringIndex, velocity)   
+  줄 반짝/진동 애니메이션 ←──────────────  이벤트 방송                          
+  currentFingering 구독해서              @Published currentFingering           
+  짚힌 자리 표시 ←─────────────────────  (멀티피어 전송에도 이걸 사용)          
+```
+
+| 기능 | 명세 |
+|------|------|
+| `FretPress` | `{ stringIndex: Int, fret: Int }` — 터치 1개의 의미 |
+| `pressesChanged(_ presses: Set<FretPress>)` | **UI가 호출.** 지금 눌려 있는 모든 칸을 통째로 전달 (멀티터치를 스냅샷으로 — began/ended 낱개보다 동시 터치 꼬임이 없음) |
+| `currentFingering: GuitarFingering` | `@Published` — 지금 짚힌 운지. UI 표시·멀티피어 전송·자동 스트럼이 공용 |
+| `notePlayed` 이벤트 | `{ stringIndex, velocity }` 방송 — UI 애니메이션·햅틱이 구독 |
+| `soundPolicy: FretSoundPolicy` | `.pluckOnPress`(누르는 순간 발음 — 모드 A·C의 넥) / `.silent`(짚기만 — 필요시) |
+
+- **만드는 사람:** 로직 담당 · **쓰는 사람:** 넥 화면 UI(호출+구독), 세션 코디네이터, 멀티피어
+- **병렬 포인트 (이게 베스트 프랙티스):**
+  - **UI 담당은** "터치 좌표 → `FretPress` 변환"과 "`notePlayed` 구독 → 그리기"만 하면 됨. 소리·상태 로직 몰라도 됨. 좌표 변환은 기존 `stringIndex(from:in:configuration:)` 패턴 재사용.
+  - **로직 담당은** 터치가 어떻게 들어오는지 몰라도 됨. `Set<FretPress>`만 받으면 끝.
+  - 서로 기다릴 필요 없음: UI는 **Mock FingeringState**(아무 입력에나 고정 응답)로 먼저 개발.
+- 🗣️ *쉬운 설명: UI는 "여기 눌렸어요"라고 쪽지(FretPress)만 넘기고, 로직은 쪽지만 보고 소리·상태를 처리한 뒤 "3번 줄 울렸어요"라고 방송한다. 서로의 속사정을 모른다.*
+
+### 3.5 스트럼 패턴 계약 [새로] — Domain/Strum
+
+**책임:** "주법(리듬) 하나"를 데이터로 표현하고, 저장하고, 박자에 맞춰 자동 연주한다.
+
+**모델 (이 모양만 지키면 어떤 리듬이든 꽂힌다):**
+
+| 타입 | 명세 |
+|------|------|
+| `StrumPattern` | `{ id, name, timeSignature, steps: [StrumStep], source: .preset/.custom }` — `Codable` |
+| `StrumStep` | `{ position: BeatPosition, direction: .up/.down, accent: .strong/.medium/.soft, isMute: Bool }` |
+| `BeatPosition` | `{ bar, beat, sub }` — 마디 안 어디서 긁는지, 16분음표 단위 |
+
+**리서치 담당을 위한 예시** — 칼립소(♩=한 박): "1박 다운, 2박 반 다운·업, 3박 쉼, 3박 반 업, 4박 다운·업" → `StrumStep` 6개로 표 채우듯 입력. **코드 지식 불필요, 표만 채우면 됨** (`Content/StrumPresetData.swift`).
+
+| 프로토콜 | 명세 |
+|------|------|
+| `StrumPatternLibraryProtocol` | `presets: [StrumPattern]`, `customs: [StrumPattern]`, `saveCustom(_:)`, `deleteCustom(id:)` |
+| `StrumPatternPlayerProtocol` | `play(pattern:looping:)`, `stop()` — 클럭(§3.2) 구독, 각 step 시점에 현재 운지로 오디오 호출. `strumPerformed` 이벤트 방송(UI 표시용) |
+
+- **만드는 사람:** 계약+플레이어는 로직 담당, 프리셋 데이터는 리서치 담당 · **쓰는 사람:** 스트로크 선택 화면, 모드 A, 미리듣기
+- 🗣️ *쉬운 설명: 주법을 악보(데이터)로 적어두면, 플레이어(자동 오른손)가 메트로놈에 맞춰 그대로 긁어준다.*
+
+### 3.6 코드진행 계약 [새로] — Domain/Progression
+
+**책임:** "코드 순서 + 각 코드 길이"를 데이터로 표현·저장하고, 시간에 따라 자동으로 짚어주고, 미리듣기를 재생한다.
+
+| 타입 | 명세 |
+|------|------|
+| `ChordProgression` | `{ id, name, items: [ProgressionItem], source: .preset/.custom }` — `Codable` |
+| `ProgressionItem` | `{ chord: GuitarChord, barCount: Int }` — "이 코드를 몇 마디" |
+
+| 프로토콜 | 명세 |
+|------|------|
+| `ChordProgressionLibraryProtocol` | `presets`(머니코드 C→G→Am→F, 캐논 등 — `Content/`에서), `customs`, `saveCustom(_:)`, `deleteCustom(id:)` |
+| `ChordProgressionPlayerProtocol` | `start(progression:bpm:looping:)`, `stop()` — 클럭 구독, 마디가 넘어가면 `currentChord`/`currentFingering`(`@Published`) 갱신 + `chordChanged` 이벤트. **이게 모드 B의 "자동 왼손"** |
+| `ProgressionPreviewPlayerProtocol` | `preview(_ progression:)`, `previewChord(_ chord:)`, `stopPreview()` — 기본 주법·기본 BPM으로 짧게 재생. **항상 하나만**: 새 미리듣기가 이전 것을 자동 정지 |
+
+- **만드는 사람:** 계약+플레이어 로직 담당, 프리셋 데이터 리서치 담당 · **쓰는 사람:** 진행 선택/커스텀 화면, 모드 B
+- 커스텀 화면이 코드를 고를 때는 **반드시 §3.3 카탈로그에서** — 별도 코드 목록 금지.
+- 🗣️ *쉬운 설명: 노래방 반주기의 왼손 버전. 정해둔 순서대로 때가 되면 코드를 갈아 짚어준다.*
+
+### 3.7 소스와 코디네이터 [새로] — Domain/Session ★이 앱의 심장
+
+**책임:** SPEC §2의 "왼손 × 오른손 = 3가지 방식" 표를 코드 구조로 옮긴 것. **모드 = 플러그 조합.**
+
+| 프로토콜 | 명세 | 구현 3종 |
+|------|------|---------|
+| `FingeringSourceProtocol` | `currentFingering: GuitarFingering` (`@Published`) — "지금 왼손이 뭘 짚고 있나" 제공 | `ManualFingeringSource`(넥 터치, §3.4를 감쌈) / `AutoFingeringSource`(진행 플레이어 §3.6) / `RemoteFingeringSource`(피어 수신 §3.8) |
+| `StrumSourceProtocol` | 스트럼 이벤트 방송: `strumOccurred(direction, velocity)` / `pluckOccurred(stringIndex, velocity)` — "오른손이 언제 어떻게 긁었나" | `ManualStrumSource`(줄 화면 터치) / `AutoStrumSource`(패턴 플레이어 §3.5) / `RemoteStrumSource`(피어 수신) |
+| `PlaySessionCoordinator` | `init(fingeringSource:strumSource:audioEngine:)` — 스트럼 이벤트가 오면 **그 순간의 운지**로 오디오 호출. `setMode(PlayMode)`로 소스 갈아끼움 | (클래스 하나) |
+
+**`PlayMode` 조합표 (SPEC §2와 1:1):**
+
+| 모드 | fingeringSource | strumSource |
+|------|----------------|-------------|
+| A 코드 연습 | Manual | Auto |
+| B 스트로크 연습 | Auto | Manual |
+| C 합주 · iPad 쪽 | **Remote** | Manual |
+| C 합주 · iPhone 쪽 | Manual (전송만, 소리 없음) | — |
+
+- **만드는 사람:** 로직 담당 · **쓰는 사람:** 메인 화면들(모드 전환 버튼), 앱 전체
+- 🗣️ *쉬운 설명: 멀티탭. 왼손 플러그와 오른손 플러그를 어느 콘센트에 꽂느냐만 바꾸면 모드가 바뀐다. 본체(코디네이터)는 그대로.*
+
+### 3.8 Multipeer (✅ 있음 + 보강) — Services/Multipeer
+
+**있음:** `MultipeerServiceProtocol`(광고/탐색/초대/전송/콜백), `PeerMessage`(`.fingering` 등), 코덱. Info.plist 권한 문구도 등록 완료.
+
+**보강할 것:**
+
+| 항목 | 명세 |
+|------|------|
+| `PeerRolePolicy` | **iPad → 항상 스트로크(오른손), iPhone → 항상 코드(왼손).** 협상 없음. 기존 `DeviceType`으로 판정 |
+| `ConnectionFlowState` | `idle → guide(첫 회만) → browsing → inviting → connected → disconnected` — 연결 UI(화면 8·9)가 이 상태만 보고 그림 |
+| `hasSeenPeerGuide` | `UserDefaults` — 봤거나 스킵했으면 다음부터 guide 단계 건너뜀 |
+| `RemoteFingeringSource` / `RemoteStrumSource` | 수신 메시지를 §3.7 소스 계약으로 감쌈 — 코디네이터는 원격인지도 모름 |
+
+- 🗣️ *쉬운 설명: 무전기는 이미 있다. "누가 어느 역할인지 고정"과 "처음 쓰는 사람용 안내 순서"만 정하면 된다.*
+
+### 3.9 `AppRouter` [새로] — App/
+
+**책임:** "무슨 버튼 → 무슨 화면"을 **한 곳에서** 관리. 화면 전환 방식이 사람마다 달라지는 것을 막는다.
+
+| 기능 | 명세 |
+|------|------|
+| `AppRoute` (enum) | SPEC §6 화면 목록과 1:1 — `.onboarding, .neck, .strum, .strokeSelect, .strokeCreate, .progressionSelect, .progressionCustom, .peerGuide, .peerBrowse` |
+| `navigate(to:)` / `back()` | 이동. `@Published currentRoute`(또는 path) |
+| 시작 규칙 | 첫 실행 → `.onboarding` · iPhone → `.neck` · iPad → `.strum`(+연결 유도) |
+
+- **규칙: 화면 전환은 반드시 라우터로.** 뷰 안에서 직접 다른 화면을 띄우지 않기.
+- 기존 `ScreenshotPrototypeViewModel`의 `screen` 전환 로직이 이것의 씨앗 — 라우터로 승격.
+- 🗣️ *쉬운 설명: 건물 안내데스크. 모든 이동은 데스크를 거친다. 그래야 "그 화면 어떻게 여는 거예요?"라는 질문이 사라진다.*
+
+### 3.10 온보딩·시스템 안내 [새로] — Features/Onboarding + Domain
+
+| 항목 | 명세 |
+|------|------|
+| `OnboardingStore` | `hasCompletedOnboarding` (`UserDefaults`) — 완료 시 이후 자동 스킵 |
+| `SystemSetupHelper` | 현재 볼륨 읽기(`AVAudioSession.outputVolume`), 볼륨 슬라이더 제공(`MPVolumeView` SwiftUI 래핑), "볼륨 낮음" 판정 |
+| 연주 화면 공통 | 진입 시 `isIdleTimerDisabled = true`(화면 꺼짐 방지), 이탈 시 해제 |
+
+- iOS에서 뭐가 되고 안 되는지는 **SPEC §플로우 4 표**가 기준 (볼륨 강제 설정 ❌ / 방해금지 켜기 ❌ → 안내로 해결).
+
+### 3.11 손맛(햅틱·피드백) [보강] — Services/Haptics + UI
+
+**책임:** 줄을 튕기고 코드를 짚는 **물리적 손맛**을 햅틱·시각으로 준다. 가상 악기의 "진짜 같음"은 소리만이 아니라 **손끝 진동**에서 온다 — 이게 없으면 그냥 유리판 두드리는 느낌이 된다. `HapticsManager`는 **이미 있으나 아직 아무 데도 연결 안 됨**(놓쳤던 부분).
+
+| 기능 | 명세 |
+|------|------|
+| 발음 햅틱 | `notePlayed`/`strumPerformed` 이벤트(§3.4·§3.5) 구독 → **세기(velocity)에 비례**한 햅틱 |
+| 짝 개발 | 줄 애니메이션(U3)과 **같은 이벤트**를 먹으므로 함께 설계 |
+
+- 🗣️ *쉬운 설명: 진짜 기타는 튕기면 손이 울린다. 그 울림을 흉내 내야 화면이 악기처럼 느껴진다.*
+- ⚠️ **iPad는 햅틱 하드웨어가 없음** — 모드 C(긁는 기기=iPad)에서의 대체 피드백은 SPEC §8 결정 안건.
+
+### 3.12 `VoiceCommandService` [새로 · 핵심] — Services/Voice
+
+**책임:** 연주 중 **말로** 프리셋을 바꾼다 — 두 손이 다 악기에 붙어 있으니 입이 세 번째 손. **SPEC §5.1의 해답.**
+
+| 기능 | 명세 |
+|------|------|
+| `startListening()` / `stopListening()` / `isListening` | 듣기 시작/정지, 상태 노출(`@Published`) |
+| `updateVocabulary(progressions:patterns:)` | 라이브러리(§3.5·§3.6)의 프리셋 **이름+음성 별칭** 목록을 등록 — 좁은 사전으로 인식률을 높이는 재료 |
+| `commandRecognized` 이벤트 | `VoiceCommand` 방송: `.changeProgression(id)` / `.changeStrumPattern(id)` (재생/정지 등 확장은 SPEC §8에서 결정) |
+| 권한 | 마이크(`NSMicrophoneUsageDescription`) + 음성인식(`NSSpeechRecognitionUsageDescription`) — **현재 Info.plist에 없음 → 태스크 V3에서 추가** |
+
+- **만드는 사람:** 음성 담당 · **쓰는 사람:** 세션 코디네이터·선택 화면(명령 받으면 라이브러리에서 프리셋 찾아 교체 + "바뀌었다" 화면·햅틱 피드백)
+- **구현 후보:** `SFSpeechRecognizer`(ko-KR, iOS 18 기준) + `contextualStrings`로 프리셋 별칭에 인식 편향. (iOS 26 전용으로 좁힐 수 있으면 새 `SpeechAnalyzer`도 후보)
+- ⚠️ **최대 리스크 = 에코**: 스피커에서 기타 소리가 나가는 중에 마이크로 들어야 함. 에코 제거(voice processing)를 켜면 기타 출력 음질에 영향 가능 → **스파이크 V1이 모든 음성 태스크보다 먼저** (실패 시 폴백: 듣기 토글 등).
+- **Mock:** `MockVoiceCommandService` — 디버그 버튼 패널로 가짜 명령을 발생 → **인식이 안 돼도** 세션·화면 쪽은 개발 가능.
+- 🗣️ *쉬운 설명: 연주 중엔 두 손이 바쁘다. "머니코드로 바꿔"라고 말하면 손 안 대고 반주가 바뀐다.*
+
+---
+
+## 4. 병렬 개발이 실제로 어떻게 돌아가나
+
+### 4.1 규칙: "계약을 만들 때 Mock도 같이 만든다"
+
+> **Mock이란?** 진짜처럼 생겼지만 속은 가짜인 대역 배우. 계약(껍데기)은 똑같이 지키므로, 진짜가 완성되면 **한 줄만 바꿔** 갈아끼운다.
+
+이미 프로젝트에 표본이 있습니다 — `Services/Sound/MockSoundPreviewService.swift` (진짜 오디오 대신 시스템 효과음으로 대체). **모든 계약(§3.2~3.10)은 정의하는 사람이 Mock 1개를 같이 만드는 것이 산출물 조건입니다** (ROADMAP Phase 1).
+
+예시:
+- `MockStrumPatternLibrary` — 하드코딩 프리셋 3개 반환 → **스트로크 선택 화면을 진짜 로직 없이 완성 가능**
+- `MockProgressionPlayer` — 3초마다 코드가 바뀌는 척 → **모드 B 화면을 진짜 플레이어 없이 개발**
+- `MockFingeringState` — 어떤 터치든 C코드라고 응답 → **넥 UI를 로직 없이 개발**
+
+### 4.2 계약별 생산자/소비자 매트릭스
+
+| 계약 | 만드는 사람(생산) | 쓰는 사람(소비) | 소비자는 뭘로 먼저 개발? |
+|------|-----------------|----------------|----------------------|
+| 3.2 BeatClock | 로직 | 플레이어들 | 고정 간격 Mock 클럭 |
+| 3.3 ChordCatalog | 로직(계약)+리서치(데이터) | 넥·진행 화면, 플레이어 | 기존 7개 코드로 충분 |
+| 3.4 FingeringState | 로직 | 넥 UI, 코디네이터, 통신 | Mock 상태 |
+| 3.5 StrumPattern | 로직(계약)+리서치(데이터) | 선택 화면, 모드 A | Mock 라이브러리 |
+| 3.6 Progression | 로직(계약)+리서치(데이터) | 선택·커스텀 화면, 모드 B | Mock 라이브러리·플레이어 |
+| 3.7 Session | 로직 | 메인 화면들 | 소스 Mock 2개 |
+| 3.8 Peer 보강 | 통신 | 연결 화면, 원격 소스 | ConnectionFlowState만 있으면 UI 가능 |
+| 3.9 Router | 기반 담당 | **전원** | — (제일 먼저 완성) |
+| 3.10 Onboarding | 기반 담당 | 온보딩 화면 | — |
+| 3.12 VoiceCommand | 음성 담당 | 세션·선택 화면 | Mock 명령 패널(디버그 버튼) |
+
+### 4.3 시나리오로 보는 병렬 (예: 진행 커스텀 화면, 화면 7)
+
+1. 계약 §3.6이 Mock과 함께 완성됨 (반나절)
+2. **동시에 출발:** 화면 담당은 Mock으로 UI 전부 구현 / 로직 담당은 진짜 플레이어·미리듣기 구현 / 리서치 담당은 머니코드·캐논 진행을 `Content/`에 입력
+3. 각자 끝나면 Mock → 진짜로 교체 (init 인자 한 줄) → 끝
+
+---
+
+## 5. 전 팀 공통 규약 (헷갈리면 여기)
+
+| 항목 | 규약 |
+|------|------|
+| 줄 번호 | `stringIndex 0 = 6번줄(저음 E)` … `5 = 1번줄(고음 E)`. 개방현 MIDI = `[40, 45, 50, 55, 59, 64]` |
+| 프렛 값 | `-1 = 뮤트(X)` · `0 = 개방현` · `1~24 = 프렛` |
+| 세기 | `velocity: UInt8` 0~127 (실사용 42~124로 클램프됨) |
+| 스트럼 방향 | `.down = 6번줄→1번줄(저음→고음)` · `.up = 반대` |
+| 박 위치 | `BeatPosition { bar(0부터), beat(0부터), sub(16분음표, 0~3) }` |
+| 화면 전환 | 반드시 `AppRouter` 경유 |
+| 색·여백 | 반드시 `DesignSystem/Tokens/` — 숫자 직접 쓰기 금지 |
+| 계약 변경 | 계약 파일을 바꾸면 **팀 공지 + 이 문서 갱신** 필수 |
