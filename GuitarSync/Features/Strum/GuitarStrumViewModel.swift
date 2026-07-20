@@ -13,6 +13,10 @@ final class GuitarStrumViewModel: ObservableObject {
 
     private var audioEngine: GuitarAudioEngineProtocol
 
+    /// 줄을 튕길 때마다 세기(0~127)를 방송한다. **모드 C에서 iPad가 이걸 iPhone으로 보내
+    /// 진동을 일으킨다** — 손맛은 실제로 줄이 튕기는 이쪽(오른손)에서 생기기 때문.
+    let strumPerformed = PassthroughSubject<UInt8, Never>()
+
     /// 손가락별 흔적.
     ///
     /// **손가락마다 따로 들고 있어야 한다.** 하나로 합쳐두면 두 손가락이 서로의 위치를 덮어써서
@@ -136,6 +140,7 @@ final class GuitarStrumViewModel: ObservableObject {
 
             if let currentStringIndex {
                 pluckString(currentStringIndex, velocity: Self.firstContactVelocity)
+                strumPerformed.send(Self.firstContactVelocity)
             }
 
             updateDebugState(track: tracks[id], axisValue: currentAxisValue, stringIndex: currentStringIndex)
@@ -149,6 +154,9 @@ final class GuitarStrumViewModel: ObservableObject {
                 to: currentStringIndex,
                 dynamics: dynamics
             )
+            if track.previousStringIndex != currentStringIndex {
+                strumPerformed.send(dynamics.velocity)
+            }
             track.previousStringIndex = currentStringIndex
         }
 

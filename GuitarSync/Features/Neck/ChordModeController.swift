@@ -79,6 +79,8 @@ final class ChordModeController: ObservableObject {
     /// 자동 스트럼도 멈춘다. 연결이 끊기면 다시 소리가 난다(모드 A).
     func setConnected(_ connected: Bool) {
         session.fingeringState.isMuted = connected
+        // 연결되면 짚을 때 진동 안 함 — 손맛은 iPad가 튕길 때 신호로 온다.
+        neck.setHapticsEnabled(!connected)
         if connected {
             stop()
         }

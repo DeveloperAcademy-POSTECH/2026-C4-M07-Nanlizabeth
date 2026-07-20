@@ -25,6 +25,12 @@ final class PeerConnectViewModel: ObservableObject {
     /// 마지막으로 보낸 운지 — 같은 값을 반복 전송하지 않으려고 기억한다.
     private var lastSentFingering: GuitarFingering?
 
+    /// 상대(iPad)가 튕겼다는 신호를 받았을 때 여기서 진동을 낸다. (모드 C의 iPhone이 손맛을 느낀다)
+    private let strumHaptics = DecayHapticPlayer()
+    /// 짧은 창 안의 여러 튕김을 하나로 합쳐 보내려는 상태.
+    private var pendingStrumVelocity: UInt8 = 0
+    private var strumSendTask: Task<Void, Never>?
+
     private let service: MultipeerServiceProtocol
     private let guideStore: PeerGuideStoreProtocol
 
@@ -103,6 +109,26 @@ final class PeerConnectViewModel: ObservableObject {
         service.send(.fingering(fingering.frets))
     }
 
+    /// 내가 튕겼다는 걸 상대(iPhone)에게 알려 **거기서 진동**하게 한다. **모드 C의 iPad(긁기 담당).**
+    /// 한 번 긁으면 여러 줄이 몰아치므로 30ms 창에서 가장 센 것 하나로 합쳐 보낸다.
+    func sendStrumHaptic(velocity: UInt8) {
+        guard isConnected else { return }
+        pendingStrumVelocity = max(pendingStrumVelocity, velocity)
+        guard strumSendTask == nil else { return }
+        strumSendTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(30))
+            guard let self else { return }
+            self.service.send(.strumHaptic(velocity: self.pendingStrumVelocity))
+            self.pendingStrumVelocity = 0
+            self.strumSendTask = nil
+        }
+    }
+
+    /// 연결을 끊는다. **iPhone(주체)이 부른다.**
+    func disconnect() {
+        stop()
+    }
+
     func stop() {
         // 세션까지 완전히 끊어 재연결이 깨끗하게 되게 한다.
         service.disconnect()
@@ -134,10 +160,22 @@ final class PeerConnectViewModel: ObservableObject {
                 self.flowState = .failed(message: message)
             }
         }
-        // 상대가 보낸 운지 → iPad가 소리 낼 재료. (모드 C의 왼손이 네트워크로 들어온다)
         service.onMessageReceived = { [weak self] message, _ in
-            guard message.type == .fingering, let frets = message.frets else { return }
-            self?.receivedFingering = GuitarFingering(frets: frets)
+            guard let self else { return }
+            switch message.type {
+            case .fingering:
+                // 상대(iPhone)가 짚은 운지 → iPad가 이걸로 소리 낸다.
+                if let frets = message.frets {
+                    self.receivedFingering = GuitarFingering(frets: frets)
+                }
+            case .strumHaptic:
+                // 상대(iPad)가 튕겼다 → iPhone이 그 세기로 진동. 손맛이 여기서 난다.
+                if let velocity = message.number {
+                    self.strumHaptics.pluck(velocity: UInt8(clamping: velocity))
+                }
+            default:
+                break
+            }
         }
     }
 }

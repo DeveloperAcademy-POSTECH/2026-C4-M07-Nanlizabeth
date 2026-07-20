@@ -25,10 +25,6 @@ struct MainInstrumentScreen: View {
         ZStack(alignment: .topTrailing) {
             instrument
 
-            if peer.isConnected {
-                connectionBanner
-            }
-
             TopControlBar(
                 mode: viewModel.mode,
                 isPlaying: viewModel.isPlaying,
@@ -87,30 +83,6 @@ struct MainInstrumentScreen: View {
         peer.isConnected ? .connected : .disconnected
     }
 
-    /// 연결됐을 때 "어떻게 연결됐는지"를 알려주는 배너 — 지금까지 피드백이 없던 부분.
-    private var connectionBanner: some View {
-        HStack(spacing: Spacing.xs) {
-            Image(systemName: "link")
-                .font(.gsCaption)
-            Text(bannerText)
-                .font(.gsCaption)
-        }
-        .foregroundStyle(Color.gsOnAccent)
-        .padding(.horizontal, Spacing.sm)
-        .padding(.vertical, Spacing.xxs)
-        .background(Capsule().fill(Color.gsAccent))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.bottom, Spacing.md)
-        .accessibilityLabel(bannerText)
-    }
-
-    private var bannerText: String {
-        let partner = peer.connectedPeerName ?? "상대"
-        // 이 기기의 역할을 사람 말로.
-        let myJob = peer.role == .fingering ? "코드(왼손) — 짚기, 소리는 상대에서" : "스트로크(오른손) — 긁기, 여기서 소리"
-        return "\(partner)와 연결됨 · 나: \(myJob)"
-    }
-
     @ViewBuilder
     private var instrument: some View {
         switch viewModel.mode {
@@ -132,11 +104,15 @@ struct MainInstrumentScreen: View {
                 }
         case .strum:
             // 스트럼 — 단독(모드 B)이거나 연결됨(모드 C). 연결되면 상대(iPhone)가 짚은 운지로 소리 난다.
+            // 그리고 내가 튕길 때마다 그 세기를 상대(iPhone)로 보내 거기서 진동이 나게 한다.
             GuitarStrumView(viewModel: strumViewModel)
                 .ignoresSafeArea()
                 .onAppear { strumViewModel.updateFingering(peer.receivedFingering.frets) }
                 .onChange(of: peer.receivedFingering) { _, fingering in
                     strumViewModel.updateFingering(fingering.frets)
+                }
+                .onReceive(strumViewModel.strumPerformed) { velocity in
+                    peer.sendStrumHaptic(velocity: velocity)
                 }
         }
     }
