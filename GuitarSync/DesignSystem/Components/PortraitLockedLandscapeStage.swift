@@ -62,7 +62,7 @@ struct PortraitLockedLandscapeStage<Content: View>: View {
                 .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
                 .clipped()
         }
-        .background(Color(red: 0.02, green: 0.04, blue: 0.045))
+        .background(Color.gsStageBackground)
         .ignoresSafeArea()
     }
 }

@@ -21,40 +21,41 @@ struct ScreenPlaceholder: View {
     @EnvironmentObject private var router: AppRouter
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Spacing.md) {
             Text(route.title)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(.white)
+                .font(.gsTitle)
+                .foregroundStyle(Color.gsTextPrimary)
 
-            VStack(spacing: 6) {
+            VStack(spacing: Spacing.xxs + 2) {
                 Text("아직 만들지 않은 화면입니다")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .font(.gsBody)
+                    .foregroundStyle(Color.gsTextSecondary)
 
                 Text("담당 태스크 \(task)")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .font(.gsCaption)
+                    .foregroundStyle(Color.gsTextTertiary)
 
                 if let hint {
                     Text(hint)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .font(.gsLabel)
+                        .foregroundStyle(Color.gsTextTertiary)
                         .multilineTextAlignment(.center)
-                        .padding(.top, 4)
+                        .padding(.top, Spacing.xxs)
                 }
             }
 
             if router.canGoBack {
                 Button("뒤로") { router.back() }
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 10)
+                    .font(.gsButton)
+                    .foregroundStyle(Color.gsTextPrimary)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.sm)
+                    .frame(minHeight: HitTarget.minimum)
                     .background(Capsule().fill(.white.opacity(0.14)))
-                    .padding(.top, 8)
+                    .padding(.top, Spacing.xs)
             }
         }
-        .padding(32)
+        .padding(Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

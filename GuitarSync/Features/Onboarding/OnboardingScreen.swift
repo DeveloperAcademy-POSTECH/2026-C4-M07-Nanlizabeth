@@ -24,10 +24,11 @@ struct OnboardingScreen: View {
             Button("건너뛰고 시작하기") {
                 router.completeOnboarding()
             }
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(.black)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 12)
+            .font(.gsButton)
+            .foregroundStyle(Color.gsTextOnLight)
+            .padding(.horizontal, Spacing.xl)
+            .padding(.vertical, Spacing.sm)
+            .frame(minHeight: HitTarget.minimum)
             .background(Capsule().fill(.white))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

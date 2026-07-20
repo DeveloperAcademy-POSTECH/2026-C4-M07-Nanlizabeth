@@ -17,7 +17,7 @@ struct AppRootView: View {
     var body: some View {
         PortraitLockedLandscapeStage {
             ZStack {
-                Color(red: 0.02, green: 0.04, blue: 0.045)
+                Color.gsStageBackground
                     .ignoresSafeArea()
 
                 screen

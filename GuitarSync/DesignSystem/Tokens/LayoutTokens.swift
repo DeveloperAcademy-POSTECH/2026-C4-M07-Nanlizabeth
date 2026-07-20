@@ -15,8 +15,8 @@ enum LayoutTokens {
     /// iPhone 15/16 가로(852×393)를 기준으로 잡았다. 기존 `GuitarLayoutConstants`의
     /// 고정 수치(넥 760×310, 사운드홀 860×330)가 이 크기를 전제로 설계돼 있다.
     ///
-    /// - Note: Figma HI-FI 프레임 크기가 확인되면 그 값으로 교체할 것 (태스크 F2).
-    ///   이 상수 하나만 바꾸면 전 화면이 함께 따라간다.
+    /// - Note: ⏳ Figma HI-FI 프레임 크기가 확인되면 그 값으로 교체할 것 (태스크 F2).
+    ///   **이 상수 하나만 바꾸면 전 화면이 함께 따라간다.**
     static let referenceStage = CGSize(width: 852, height: 393)
 
     /// 기준 도화지를 실제 스테이지 크기에 맞추기 위한 배율.
