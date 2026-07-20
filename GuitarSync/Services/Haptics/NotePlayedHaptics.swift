@@ -20,6 +20,7 @@ final class NotePlayedHaptics {
     /// 이 시간 안에 들어온 이벤트는 한 번의 진동으로 합친다.
     private let coalesceWindow: TimeInterval = 0.03
 
+    private let decayPlayer = DecayHapticPlayer()
     private var cancellable: AnyCancellable?
     private var pendingMaxVelocity: UInt8 = 0
     private var flushTask: Task<Void, Never>?
@@ -49,7 +50,8 @@ final class NotePlayedHaptics {
         flushTask = Task { [weak self, coalesceWindow] in
             try? await Task.sleep(for: .seconds(coalesceWindow))
             guard let self, !Task.isCancelled else { return }
-            HapticsManager.pluck(velocity: self.pendingMaxVelocity)
+            // 강하게 시작해 서서히 잦아드는 진동 (H2). 실기기에서만 감쇠가 느껴진다.
+            self.decayPlayer.pluck(velocity: self.pendingMaxVelocity)
             self.pendingMaxVelocity = 0
             self.flushTask = nil
         }

@@ -10,6 +10,9 @@ struct MainInstrumentScreen: View {
     /// 스트로크 선택(U4)에서 고른 주법. 재생 시 자동 스트럼이 이걸 긁는다.
     var selectedStrumPattern: StrumPattern?
 
+    /// 연결 버튼(🔗)을 눌렀을 때. 기기 찾기 화면으로 이동한다 (AppRootView가 라우팅).
+    var onPeerConnect: () -> Void = {}
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             instrument
@@ -21,7 +24,7 @@ struct MainInstrumentScreen: View {
                 peerButtonState: viewModel.peerButtonState,
                 actionTitle: viewModel.actionTitle,
                 onModeChange: viewModel.toggleMode(_:),
-                onPeer: viewModel.togglePeerConnection,
+                onPeer: onPeerConnect,
                 onAction: viewModel.openActionScreen,
                 onTogglePlayback: viewModel.togglePlayback,
                 onToggleBPM: viewModel.toggleBPM,

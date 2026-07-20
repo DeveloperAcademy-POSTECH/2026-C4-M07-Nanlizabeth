@@ -49,12 +49,16 @@ final class StrumSelectViewModel: ObservableObject {
     @Published private(set) var selectedID: UUID?
 
     private let library: StrumPatternLibraryProtocol
+    private let preview: StrumPatternPreviewPlayer
 
-    /// - Parameter library: 테스트·프리뷰에서 Mock을 넣기 위한 자리. 비우면 실제 프리셋을 읽는다.
-    ///   기본값을 `nil`로 둔 이유: `StrumPatternLibrary`는 `@MainActor`라 기본 인자 자리
-    ///   (비격리 문맥)에서는 만들 수 없고, 격리된 `init` 안에서 만들어야 한다.
-    init(library: StrumPatternLibraryProtocol? = nil) {
+    /// - Parameters:
+    ///   - library: 테스트·프리뷰에서 Mock을 넣기 위한 자리. 비우면 실제 프리셋을 읽는다.
+    ///   - preview: 미리듣기 플레이어. 비우면 실제 엔진으로 만든다.
+    ///   기본값을 `nil`로 둔 이유: `@MainActor` 타입은 기본 인자 자리(비격리 문맥)에서
+    ///   만들 수 없고, 격리된 `init` 안에서 만들어야 한다.
+    init(library: StrumPatternLibraryProtocol? = nil, preview: StrumPatternPreviewPlayer? = nil) {
         self.library = library ?? StrumPatternLibrary()
+        self.preview = preview ?? StrumPatternPreviewPlayer(engine: GuitarAudioEngineFactory.makeDefault())
     }
 
     /// 필터를 통과한 주법들.
@@ -87,7 +91,14 @@ final class StrumSelectViewModel: ObservableObject {
         pattern.id == selectedID
     }
 
+    /// 고르면 그 주법을 **C코드로 짧게 들려준다** (한 번에 하나만).
     func select(_ pattern: StrumPattern) {
         selectedID = pattern.id
+        preview.preview(pattern)
+    }
+
+    /// 화면을 벗어날 때 미리듣기를 멈춘다.
+    func stopPreview() {
+        preview.stopPreview()
     }
 }
