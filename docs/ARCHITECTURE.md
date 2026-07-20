@@ -27,7 +27,7 @@
 
 ### ⛔ 없는 것 (이제 만들 것)
 
-박자 클럭 · 스트럼 패턴 모델/플레이어 · 코드진행 모델/플레이어 · 운지 상태 관리(멀티터치 개별 발음) · 소스/코디네이터(모드 조립) · 라우터 · 온보딩 · 디자인 토큰 · 미리듣기 플레이어 · `gs_instruments.dls` · 줄 애니메이션 · 성능 계측 도구 · **지연(latency) 측정 · 오디오 중단 대응 · 햅틱 연결 · 음성 명령(연주 중 프리셋 전환)**
+박자 클럭 · 스트럼 패턴 모델/플레이어 · 코드진행 모델/플레이어 · 운지 상태 관리(멀티터치 개별 발음) · 소스/코디네이터(모드 조립) · 라우터 · 온보딩 · 디자인 토큰 · 미리듣기 플레이어 · `gs_instruments.dls` · 줄 애니메이션 · 성능 계측 도구 · **지연(latency) 측정 · 오디오 중단 대응 · 햅틱 연결(Core Haptics 감쇠 포함)**
 
 ---
 
@@ -282,27 +282,15 @@ GuitarSync/
 | 기능 | 명세 |
 |------|------|
 | 발음 햅틱 | `notePlayed`/`strumPerformed` 이벤트(§3.4·§3.5) 구독 → **세기(velocity)에 비례**한 햅틱 |
+| 감쇠 햅틱 | 튕긴 순간 강 → 서서히 약. **`UIImpactFeedbackGenerator`로는 불가** → **Core Haptics**(`CHHapticEvent .continuous` + `CHHapticParameterCurve`)로 승격 필요 |
+| 판정 햅틱 | 목표 코드와 다른 운지 → 강한 진동. `currentFingering`(§3.4) vs 카탈로그 운지(§3.3) 비교 로직 필요 |
 | 짝 개발 | 줄 애니메이션(U3)과 **같은 이벤트**를 먹으므로 함께 설계 |
 
 - 🗣️ *쉬운 설명: 진짜 기타는 튕기면 손이 울린다. 그 울림을 흉내 내야 화면이 악기처럼 느껴진다.*
 - ⚠️ **iPad는 햅틱 하드웨어가 없음** — 모드 C(긁는 기기=iPad)에서의 대체 피드백은 SPEC §8 결정 안건.
+- 📌 음성 명령을 뺀 뒤 **접근성의 주인공**이 된 영역입니다 ([LEARNING-AREAS §5](LEARNING-AREAS.md)).
 
-### 3.12 `VoiceCommandService` [새로 · 핵심] — Services/Voice
-
-**책임:** 연주 중 **말로** 프리셋을 바꾼다 — 두 손이 다 악기에 붙어 있으니 입이 세 번째 손. **SPEC §5.1의 해답.**
-
-| 기능 | 명세 |
-|------|------|
-| `startListening()` / `stopListening()` / `isListening` | 듣기 시작/정지, 상태 노출(`@Published`) |
-| `updateVocabulary(progressions:patterns:)` | 라이브러리(§3.5·§3.6)의 프리셋 **이름+음성 별칭** 목록을 등록 — 좁은 사전으로 인식률을 높이는 재료 |
-| `commandRecognized` 이벤트 | `VoiceCommand` 방송: `.changeProgression(id)` / `.changeStrumPattern(id)` (재생/정지 등 확장은 SPEC §8에서 결정) |
-| 권한 | 마이크(`NSMicrophoneUsageDescription`) + 음성인식(`NSSpeechRecognitionUsageDescription`) — **현재 Info.plist에 없음 → 태스크 V3에서 추가** |
-
-- **만드는 사람:** 음성 담당 · **쓰는 사람:** 세션 코디네이터·선택 화면(명령 받으면 라이브러리에서 프리셋 찾아 교체 + "바뀌었다" 화면·햅틱 피드백)
-- **구현 후보:** `SFSpeechRecognizer`(ko-KR, iOS 18 기준) + `contextualStrings`로 프리셋 별칭에 인식 편향. (iOS 26 전용으로 좁힐 수 있으면 새 `SpeechAnalyzer`도 후보)
-- ⚠️ **최대 리스크 = 에코**: 스피커에서 기타 소리가 나가는 중에 마이크로 들어야 함. 에코 제거(voice processing)를 켜면 기타 출력 음질에 영향 가능 → **스파이크 V1이 모든 음성 태스크보다 먼저** (실패 시 폴백: 듣기 토글 등).
-- **Mock:** `MockVoiceCommandService` — 디버그 버튼 패널로 가짜 명령을 발생 → **인식이 안 돼도** 세션·화면 쪽은 개발 가능.
-- 🗣️ *쉬운 설명: 연주 중엔 두 손이 바쁘다. "머니코드로 바꿔"라고 말하면 손 안 대고 반주가 바뀐다.*
+> 🗑️ **3.12 `VoiceCommandService` — 삭제됨 (2026-07-20).** 음성 명령 기능을 범위에서 제외하기로 결정했습니다 (에코 리스크 + 접근성 축을 햅틱으로 일원화). SPEC §5 결정 기록 참고. **§3.12를 참조하던 태스크(C8·V1~V3)도 함께 삭제**됐습니다.
 
 ---
 
@@ -332,7 +320,7 @@ GuitarSync/
 | 3.8 Peer 보강 | 통신 | 연결 화면, 원격 소스 | ConnectionFlowState만 있으면 UI 가능 |
 | 3.9 Router | 기반 담당 | **전원** | — (제일 먼저 완성) |
 | 3.10 Onboarding | 기반 담당 | 온보딩 화면 | — |
-| 3.12 VoiceCommand | 음성 담당 | 세션·선택 화면 | Mock 명령 패널(디버그 버튼) |
+| 3.11 Haptics | 접근성 담당 | 넥·스트럼 화면 | `notePlayed` 이벤트만 있으면 가능 |
 
 ### 4.3 시나리오로 보는 병렬 (예: 진행 커스텀 화면, 화면 7)
 
