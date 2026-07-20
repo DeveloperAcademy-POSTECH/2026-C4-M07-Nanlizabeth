@@ -86,9 +86,15 @@ struct AppRootView: View {
                 viewModel: prototypeViewModel,
                 peer: peerConnect,
                 selectedStrumPattern: strumSelect.selectedPattern,
+                selectedProgression: progression.select.selectedProgression,
                 // 처음이면 가이드부터, 봤으면 바로 기기 찾기로. (SPEC 플로우3)
                 onPeerConnect: {
                     router.navigate(to: peerConnect.shouldShowGuide ? .peerGuide : .peerBrowse)
+                },
+                // 모드 토글이 **라우터 route까지** 바꾼다 — 그래야 선택·뒤로가기가 그 모드로 돌아온다.
+                onModeChange: { mode in
+                    prototypeViewModel.showBPM = false
+                    router.replaceRoot(with: mode == .chord ? .neck : .strum)
                 }
             )
 
