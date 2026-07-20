@@ -37,11 +37,14 @@ struct GuitarStrumView: View {
                 guitarBody(in: proxy.size)
                 strings(in: proxy.size, band: stringBand)
 
-                // The images are visual only. Sound is requested through this transparent input layer.
-                StringInputLayerView(
-                    onChanged: viewModel.handleInputChanged(location:in:),
-                    onEnded: viewModel.handleInputEnded
-                )
+                // 줄 그림은 눈으로 보는 용도고, 소리는 이 투명 레이어를 통해 요청된다.
+                // **손가락을 전부 받는다** — 아르페지오처럼 여러 줄을 동시에 튕기려면 필요하다.
+                MultiTouchLayer { touches in
+                    viewModel.handleTouchesChanged(
+                        touches,
+                        in: CGSize(width: stringBand.width, height: stringBand.height)
+                    )
+                }
                 .frame(width: stringBand.width, height: stringBand.height)
                 .position(x: stringBand.midX, y: stringBand.midY)
 
@@ -169,6 +172,7 @@ struct GuitarStrumView: View {
             Text("raw: \(viewModel.debugState.rawDirection?.rawValue ?? "-")")
             Text("mapped: \(viewModel.debugState.direction?.displayName ?? "-")")
             Text("reverse: \(viewModel.debugState.reverseStringMapping ? "true" : "false")")
+            Text("fingers: \(viewModel.debugState.activeTouchCount)")
         }
         .font(.system(size: 13, weight: .semibold, design: .monospaced))
         .foregroundStyle(.white)
