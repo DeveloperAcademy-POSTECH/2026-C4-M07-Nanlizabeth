@@ -49,11 +49,21 @@
 | 라우터·온보딩 저장 | `App/AppRouter.swift`·`AppRootView.swift` | F3 |
 | 디자인 토큰 | `DesignSystem/Tokens/` (Layout·Color·Typography·Spacing) | F1·F2 |
 
-### ⛔ 아직 없는 것 (Phase 2에서 만들 것)
+### ⛔ 아직 없는 것 (남은 Phase 2·3)
 
-플레이어 **구현**(주법·진행·미리듣기 — 계약과 Mock만 있음) · 스트럼 실제 화면 · 온보딩 화면 · 진행 커스텀 화면 · 원격 소스 연결 · 줄 애니메이션 · `gs_instruments.dls` · 성능 계측 도구 · **지연(latency) 측정 · 햅틱 연결(Core Haptics 감쇠 포함)**
+- **스트럼 화면 시각화 + iPad 레이아웃** (이미지→벡터 재작성, SPEC §8 iPad 결정 대기)
+- **모드 B/C 화면 연결** (위 스트럼 화면과 함께 — 모드 A는 연결됨)
+- `gs_instruments.dls`(에셋) · 성능·지연 계측(A2, 기기) · **H2 Core Haptics 감쇠**(기기)
+- 콘텐츠 리서치(CT1~3) · 통합 QA·엔진 결정(I4·I5, 기기)
 
-> ✅ **Phase 2에서 `develop`에 병합된 것 (PR #4~#7):** U7 연결 화면(초안) · A4 오디오 중단 대응 · **U2 기타넥 화면**(`Features/Neck/`) · **U3 스트럼 멀티터치 입력** · **U4 스트로크 선택 화면**.
+> ✅ **Phase 2에서 `develop`에 병합된 것 (PR #4~#15):**
+> A4 오디오 세션 복구 · **L2·L3·L4** 플레이어(주법·진행·미리듣기, 실구현) ·
+> **I1·I2·I3** 세 모드 조립(`ChordPracticeSession`·`StrumPracticeSession`·`EnsembleStrummerSession`) ·
+> **N1** 원격 소스 배선 · **H1** 발음 햅틱 · **H3** 판정 햅틱(메커니즘) ·
+> 화면 **U1·U2·U4·U5·U6·U7** + U3 멀티터치 입력 ·
+> **모드 A 화면 연결**(`ChordModeController` — 넥에서 짚고 재생하면 자동 스트럼).
+>
+> 세 모드 전부 **기록형 가짜 엔진 + `MockBeatClock`으로 로직 체인 검증**됨. 남은 검증은 실기기 소리·햅틱.
 >
 > 🖐️ **멀티터치는 `DesignSystem/Components/MultiTouchLayer.swift` 하나를 넥·스트럼이 공유합니다.**
 > SwiftUI `DragGesture`는 손가락을 **하나만** 주기 때문에 기타 앱에서는 쓸 수 없습니다 — 화음을 짚거나

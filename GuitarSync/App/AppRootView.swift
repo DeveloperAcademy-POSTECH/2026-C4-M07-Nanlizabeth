@@ -4,9 +4,9 @@ import SwiftUI
 ///
 /// **화면을 추가·교체할 때 고치는 파일은 여기 하나다.** 뷰 안에서 다른 화면을 직접 띄우지 않는다.
 ///
-/// ## 지금 상태 (2026-07-20, 태스크 F3)
-/// 화면 9개가 전부 등록돼 있고, 아직 안 만든 4개는 `ScreenPlaceholder`가 자리를 잡고 있다.
-/// U 레인은 **자기 화면의 case 한 줄만 바꾸면** 된다.
+/// ## 지금 상태
+/// 화면이 전부 실구현으로 등록돼 있다. 넥·스트럼은 아직 프로토타입 셸(`MainInstrumentScreen`)에
+/// 함께 들어 있고, 나머지(온보딩·선택·커스텀·연결)는 각자 독립 화면이다.
 struct AppRootView: View {
     @StateObject private var router = AppRouter()
 

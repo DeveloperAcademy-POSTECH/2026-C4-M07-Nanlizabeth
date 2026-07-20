@@ -9,11 +9,9 @@ final class ScreenshotPrototypeViewModel: ObservableObject {
     @Published var isPlaying = false
     @Published var bpm: Double = 70
     @Published var showBPM = false
-    @Published var selectedChordRoot = "C"
     @Published var isControlBarExpanded = true
     @Published var peerButtonState: PrototypePeerButtonState = .disconnected
-    @Published var selectedFingerNumber: Int?
-    @Published var selectedFingeringChord: GuitarChord?
+    /// 상대(iPad→iPhone 등)가 보낸 운지·손가락 번호. 스트럼 사운드홀 표시가 읽는다.
     @Published var receivedFingerNumber: Int?
     @Published var receivedFrets: [Int] = Array(repeating: 0, count: GuitarFingering.stringCount)
 
@@ -40,7 +38,6 @@ final class ScreenshotPrototypeViewModel: ObservableObject {
                 if let frets = message.frets {
                     self?.receivedFrets = GuitarFingering(frets: frets).frets
                 }
-                self?.selectedFingeringChord = message.chord
             default:
                 return
             }
@@ -92,11 +89,6 @@ final class ScreenshotPrototypeViewModel: ObservableObject {
         screen = .main
     }
 
-    func selectFingerNumber(_ number: Int) {
-        selectedFingerNumber = number
-        multipeerService.send(.fingerNumber(number))
-    }
-
     /// 넥 화면(U2)의 실시간 운지를 상대 기기로 보낸다.
     ///
     /// **같은 운지는 다시 보내지 않는다** — 손가락을 얹고 있는 동안 메시지가 쏟아지면
@@ -107,13 +99,5 @@ final class ScreenshotPrototypeViewModel: ObservableObject {
         lastSentFingering = fingering
         receivedFrets = fingering.frets
         multipeerService.send(.fingering(fingering.frets))
-    }
-
-    func selectFingeringChord(_ chord: GuitarChord) {
-        selectedFingerNumber = nil
-        selectedFingeringChord = chord
-        let fingering = chord.fingering
-        receivedFrets = fingering.frets
-        multipeerService.send(.fingering(fingering.frets, chord: chord))
     }
 }
