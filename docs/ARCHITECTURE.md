@@ -7,7 +7,17 @@
 
 ---
 
-## 1. 현재 구현 현황 (2026-07-17 기준)
+## 1. 현재 구현 현황 (2026-07-20 기준)
+
+> ✅ **Phase 0(기반)과 Phase 1(계약+Mock)이 끝났습니다.** 이제 6개 레인이 동시에 출발할 수 있습니다.
+> 계약은 전부 `프로토콜 + 기본 구현 + Mock + 사용 예시 주석` 형태로 들어가 있으니,
+> 자기 태스크의 관련 계약 파일을 열어 주석부터 읽으면 됩니다.
+>
+> | Phase | 태스크 | 상태 |
+> |-------|--------|------|
+> | 0 | F1 레이아웃 규약 · F2 토큰 · F3 라우터 · F4 폴더 · F5 온보딩 정책 | ✅ (F2는 Figma 값 대기) |
+> | 1 | C1 클럭 · C2 카탈로그 · C3 운지 · C4 주법 · C5 진행 · C6 세션 · C7 연결 | ✅ |
+
 
 ### ✅ 이미 있는 것
 
@@ -25,9 +35,23 @@
 | Mock 예시 | `Services/Sound/MockSoundPreviewService.swift` | ✅ **우리 프로젝트의 Mock 패턴 표본** |
 | 통신 권한 문구 | `Config/Info.plist` (로컬네트워크·Bonjour·블루투스) | ✅ 이미 등록됨 |
 
-### ⛔ 없는 것 (이제 만들 것)
+### 🆕 이번에 추가된 것 (Phase 0·1)
 
-박자 클럭 · 스트럼 패턴 모델/플레이어 · 코드진행 모델/플레이어 · 운지 상태 관리(멀티터치 개별 발음) · 소스/코디네이터(모드 조립) · 라우터 · 온보딩 · 디자인 토큰 · 미리듣기 플레이어 · `gs_instruments.dls` · 줄 애니메이션 · 성능 계측 도구 · **지연(latency) 측정 · 오디오 중단 대응 · 햅틱 연결(Core Haptics 감쇠 포함)**
+| 영역 | 파일 | 태스크 |
+|------|------|--------|
+| 박자 클럭 | `Domain/Clock/BeatClock.swift` (+`MockBeatClock`) | C1 |
+| 코드 카탈로그 | `Domain/Fingering/ChordCatalog.swift` + `Content/ChordCatalogData.swift` | C2 |
+| 운지 상태 | `Domain/Fingering/FingeringState.swift` (+Mock) | C3 |
+| 주법 | `Domain/Strum/StrumPattern.swift`·`StrumPatternLibrary.swift` + `Content/StrumPresetData.swift` | C4 |
+| 코드진행 | `Domain/Progression/ChordProgression.swift`·`ChordProgressionLibrary.swift` + `Content/ProgressionPresetData.swift` | C5 |
+| 세션(모드 조립) | `Domain/Session/PlaySession.swift`·`PlaySources.swift` | C6 |
+| 연결 정책 | `Services/Multipeer/PeerRolePolicy.swift` | C7 |
+| 라우터·온보딩 저장 | `App/AppRouter.swift`·`AppRootView.swift` | F3 |
+| 디자인 토큰 | `DesignSystem/Tokens/` (Layout·Color·Typography·Spacing) | F1·F2 |
+
+### ⛔ 아직 없는 것 (Phase 2에서 만들 것)
+
+플레이어 **구현**(주법·진행·미리듣기 — 계약과 Mock만 있음) · 넥/스트럼 실제 화면 · 온보딩 화면 · 진행 커스텀 화면 · 연결 화면 · 원격 소스 연결 · 줄 애니메이션 · `gs_instruments.dls` · 성능 계측 도구 · **지연(latency) 측정 · 오디오 중단 대응 · 햅틱 연결(Core Haptics 감쇠 포함)**
 
 ---
 
