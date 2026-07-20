@@ -48,7 +48,7 @@
 - **Native vs AudioKit 두 엔진을 계약 뒤에 살려두고 나중에 고르는 A/B 전략** — 왜 지금 안 고르나
 
 **볼 것 (체크리스트)**
-- [ ] `GuitarSync/Services/Audio/` 전체 (`GuitarAudioEngineProtocol` / `Base` / `Native` / `AudioKit` / `Factory`)
+- [ ] `GuitarSync/Domain/Audio/` 전체 (`GuitarAudioEngineProtocol` / `Base` / `Native` / `AudioKit` / `Factory`)
 - [ ] `docs/tech-notes/audio-pipeline.md` (동작 원리)
 - [ ] `docs/adr/0002-audio-engine.md` (왜 이 기술)
 - [ ] ARCHITECTURE §3.1 (계약 + ⚠️ 지연·중단·폴리포니 보강 노트)
@@ -96,7 +96,7 @@
 - [ ] ARCHITECTURE §2(폴더 구조) · §3.9(라우터) · §4(병렬 개발이 실제로 어떻게 도나)
 - [ ] ROADMAP §1(두 원칙) · §7(용어 사전)
 - [ ] `GuitarSync/Services/Sound/MockSoundPreviewService.swift` ← **우리 프로젝트의 Mock 패턴 표본**
-- [ ] `GuitarSync/Services/Audio/GuitarAudioEngineFactory.swift`, `Views/Components/DebugAudioEngineToggle.swift`
+- [ ] `GuitarSync/Domain/Audio/GuitarAudioEngineFactory.swift`, `Features/Shared/DebugAudioEngineToggle.swift`
 
 **🔧 얹으면 좋은 곁가지 — 디자인 시스템/토큰**
 - 색·여백·글자에 **이름을 붙여**(`Spacing = 16`) 숫자 직접 쓰기를 막는 규칙(`DesignSystem/Tokens/`). "왜 숫자를 직접 쓰면 안 되나"를 이해하는 좋은 소재.
@@ -116,7 +116,7 @@
 
 **볼 것 (체크리스트)**
 - [ ] ARCHITECTURE §3.4(운지↔UI 이벤트) · §3.5(스트럼) · §3.6(코드진행) · §3.7(소스·코디네이터)
-- [ ] `GuitarSync/ViewModels/GuitarStrumViewModel.swift` (좌표→줄 매핑, 긁는 속도→세기)
+- [ ] `GuitarSync/Features/Strum/GuitarStrumViewModel.swift` (좌표→줄 매핑, 긁는 속도→세기)
 - [ ] SPEC §2(왼손×오른손 조합표) · §4(개별 발음 요구사항)
 
 **🔧 얹으면 좋은 곁가지 (두 개)**

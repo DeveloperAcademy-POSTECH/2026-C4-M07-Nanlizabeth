@@ -13,15 +13,15 @@
 
 | 영역 | 파일 | 상태 |
 |------|------|------|
-| 소리 엔진 계약 | `Services/Audio/GuitarAudioEngineProtocol.swift` | ✅ 두 엔진의 공통 껍데기 |
-| 소리 엔진 공통 로직 | `Services/Audio/GuitarAudioEngineBase.swift` | ✅ 음 계산·벨로시티·자동 정지 |
-| Native 엔진 | `Services/Audio/NativeAudioEngine.swift` | ✅ AVAudioEngine + 샘플러 6개 + 리버브 |
-| AudioKit 엔진 | `Services/Audio/AudioKitAudioEngine.swift` | ✅ 패키지 없어도 컴파일되게 가드됨 |
-| 엔진 팩토리 + A/B 토글 | `GuitarAudioEngineFactory.swift`, `DebugAudioEngineToggle.swift` | ✅ 재빌드 없이 런타임 교체 |
-| 스트럼 입력 계산 | `ViewModels/GuitarStrumViewModel.swift` | ✅ 좌표→줄 매핑, 긁는 속도→세기(velocity) |
+| 소리 엔진 계약 | `Domain/Audio/GuitarAudioEngineProtocol.swift` | ✅ 두 엔진의 공통 껍데기 |
+| 소리 엔진 공통 로직 | `Domain/Audio/GuitarAudioEngineBase.swift` | ✅ 음 계산·벨로시티·자동 정지 |
+| Native 엔진 | `Domain/Audio/NativeAudioEngine.swift` | ✅ AVAudioEngine + 샘플러 6개 + 리버브 |
+| AudioKit 엔진 | `Domain/Audio/AudioKitAudioEngine.swift` | ✅ 패키지 없어도 컴파일되게 가드됨 |
+| 엔진 팩토리 + A/B 토글 | `Domain/Audio/GuitarAudioEngineFactory.swift`, `Features/Shared/DebugAudioEngineToggle.swift` | ✅ 재빌드 없이 런타임 교체 |
+| 스트럼 입력 계산 | `Features/Strum/GuitarStrumViewModel.swift` | ✅ 좌표→줄 매핑, 긁는 속도→세기(velocity) |
 | 통신 | `Services/Multipeer/` (서비스·코덱·메시지) | ✅ 운지(`.fingering`) 전송까지 실동작 |
-| 코드 데이터 | `Models/GuitarChord.swift`(7개) + `GuitarFingering.swift` | 🟡 카탈로그로 확장 필요 |
-| 화면 4종 | `Views/Screens/` | 🟡 와이어프레임(더미 데이터) |
+| 코드 데이터 | `Domain/Fingering/GuitarChord.swift`(7개) + `Domain/Fingering/GuitarFingering.swift` | 🟡 카탈로그로 확장 필요 |
+| 화면 4종 | `Features/` | 🟡 와이어프레임(더미 데이터) |
 | Mock 예시 | `Services/Sound/MockSoundPreviewService.swift` | ✅ **우리 프로젝트의 Mock 패턴 표본** |
 | 통신 권한 문구 | `Config/Info.plist` (로컬네트워크·Bonjour·블루투스) | ✅ 이미 등록됨 |
 
@@ -31,7 +31,7 @@
 
 ---
 
-## 2. 목표 폴더 구조
+## 2. 폴더 구조 ✅ 적용 완료 (2026-07-20, 태스크 F4)
 
 **폴더를 고르는 규칙 다섯 줄 (이것만 기억):**
 1. 화면 없이 돌아가는 규칙(로직) → `Domain/`
@@ -64,23 +64,29 @@ GuitarSync/
 │   ├── StrumPresetData.swift           주법 프리셋 (칼립소, 고고 …)
 │   └── ProgressionPresetData.swift     진행 프리셋 (머니코드, 캐논 …)
 │
-├── Features/                        화면 단위 (기존 Views/·ViewModels/ 재편)
+├── Features/                        화면 단위 (기존 Views/·ViewModels/ 재편 — Views/·ViewModels/ 폴더는 사라짐)
 │   ├── Onboarding/                  [새로]
-│   ├── Neck/                        기타넥(운지) — 기존 Fretboard 뷰 이동
-│   ├── Strum/                       스트로크 연주 — 기존 GuitarStrumView 이동
-│   ├── StrokeSelect/                기존 StrumSelectScreen 이동
-│   ├── ProgressionSelect/           기존 ChordProgressionScreen 이동
+│   ├── Neck/                        ScreenshotFretboardView
+│   ├── Strum/                       GuitarStrumView + ViewModel + 줄 입력/이미지 뷰
+│   ├── StrokeSelect/                StrumSelectScreen
+│   ├── StrokeCreate/                StrumCreateScreen
+│   ├── ProgressionSelect/           ChordProgressionScreen
 │   ├── ProgressionCustom/           [새로]
-│   └── PeerConnect/                 [새로] 가이드 + 근처 기기 찾기
+│   ├── PeerConnect/                 [새로] 가이드 + 근처 기기 찾기
+│   └── Shared/                      ⚠️프로토타입 셸 — 라우터(F3)가 대체하면 정리 대상
+│                                    (ScreenshotPrototypeView/ViewModel, MainInstrumentScreen,
+│                                     TopControlBar, BPMPopover, DebugAudioEngineToggle)
 │
 ├── Services/                        시스템 연동 (Audio는 Domain으로 이사)
-│   ├── Multipeer/  Haptics/  Device/  Logging/
+│   ├── Multipeer/  Haptics/  Device/  Logging/  Sound/
 │
 ├── Models/                          공용 순수 모델 (StrumDirection, 좌표 규약 등)
 └── Resources/                       gs_instruments.dls (예정), 이미지 등
 ```
 
-> 📦 **기존 파일 이사는 초기에 딱 1회, 한 사람이** 합니다 (ROADMAP 태스크 F4, 30분짜리). 각자 이사하면 충돌 납니다. 이사 후에는 위 규칙대로만 새 파일을 만드세요.
+> 📦 **기존 파일 이사는 초기에 딱 1회, 한 사람이** 합니다 (ROADMAP 태스크 F4). ✅ **완료됨.** 이후에는 위 규칙대로만 새 파일을 만드세요.
+>
+> 🧭 **어디에 둘지 헷갈릴 때 실제로 쓴 판단 기준:** 두 화면 이상이 쓰거나 화면과 무관하면 `DesignSystem/Components/`, 한 화면 전용이면 그 화면 폴더. (예: `HeaderBar`는 3개 화면이 써서 DesignSystem, `BPMPopover`는 한 화면만 써서 그 화면 옆)
 
 ---
 
