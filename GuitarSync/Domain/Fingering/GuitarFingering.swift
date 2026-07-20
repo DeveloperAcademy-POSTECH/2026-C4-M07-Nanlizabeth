@@ -1,4 +1,8 @@
-struct GuitarFingering: Equatable {
+/// 왼손이 지금 짚고 있는 상태 — 6개 줄 각각 몇 프렛인가.
+///
+/// **규약 (ARCHITECTURE §5):** `frets[0]` = 6번줄(저음 E) … `frets[5]` = 1번줄(고음 E).
+/// 값은 `-1`=뮤트 · `0`=개방현 · `1~`=프렛 번호.
+struct GuitarFingering: Equatable, Hashable, Codable {
     static let stringCount = 6
 
     var frets: [Int]
@@ -18,6 +22,17 @@ struct GuitarFingering: Equatable {
         guard frets.indices.contains(stringIndex) else { return nil }
         return frets[stringIndex]
     }
+
+    /// 이 줄을 소리 낼 수 있는가 (뮤트가 아닌가).
+    func isAudible(stringIndex: Int) -> Bool {
+        guard let fret = fret(for: stringIndex) else { return false }
+        return fret >= 0
+    }
+
+    /// 아무 줄도 울리지 않는 상태인가 (전부 뮤트).
+    var isSilent: Bool {
+        frets.allSatisfy { $0 < 0 }
+    }
 }
 
 extension GuitarFingering {
@@ -32,22 +47,11 @@ extension GuitarFingering {
 }
 
 extension GuitarChord {
+    /// 이 코드의 운지. **실제 데이터는 `Content/ChordCatalogData.swift`에 있다.**
+    ///
+    /// 카탈로그에 없는 코드면 개방현을 돌려준다 (소리는 나되 틀린 음이 아님).
+    /// 특정 카탈로그를 지정해 조회하려면 `ChordCatalog.fingering(for:)`를 직접 쓴다.
     var fingering: GuitarFingering {
-        switch self {
-        case .c:
-            return .cMajor
-        case .d:
-            return .dMajor
-        case .e:
-            return .eMajor
-        case .g:
-            return .gMajor
-        case .a:
-            return .aMajor
-        case .am:
-            return .aMinor
-        case .em:
-            return .eMinor
-        }
+        ChordCatalog.shared.fingering(for: self) ?? .open
     }
 }
