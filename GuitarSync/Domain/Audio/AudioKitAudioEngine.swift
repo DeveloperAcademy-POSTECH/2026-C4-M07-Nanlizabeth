@@ -10,8 +10,9 @@ import Foundation
 /// 프로젝트가 정상적으로 컴파일되도록 한다.
 @MainActor
 final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtocol {
-    private let engine = AudioEngine()
-    private let samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
+    // 미디어 서비스 리셋 뒤에는 새로 만들어야 하므로 `var`다. (ROADMAP 태스크 A4 · `rebuildEngine()`)
+    private var engine = AudioEngine()
+    private var samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
     private lazy var mixer = Mixer(samplers.map { $0 as Node })
 
     override init() {
@@ -39,6 +40,24 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
 
     override func performStop() {
         engine.stop()
+    }
+
+    override var isEngineRunning: Bool { engine.avEngine.isRunning }
+
+    /// 엔진·샘플러·믹서를 전부 버리고 새로 만든다. (ROADMAP 태스크 A4)
+    ///
+    /// AudioKit의 `AudioEngine`도 내부적으로 `AVAudioEngine`을 쓰므로,
+    /// 미디어 서비스 리셋 뒤에는 네이티브와 똑같이 객체부터 새로 만들어야 한다.
+    override func rebuildEngine() {
+        engine.stop()
+
+        engine = AudioEngine()
+        samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
+        mixer = Mixer(samplers.map { $0 as Node })
+
+        isSetUp = false
+        setupEngine()
+        performStart()
     }
 
     override func playNote(stringIndex: Int, note: Int, velocity: UInt8) {

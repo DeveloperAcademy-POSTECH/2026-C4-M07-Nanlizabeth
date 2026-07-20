@@ -5,10 +5,12 @@ import Foundation
 /// AVAudioEngine + AVAudioUnitSampler 기반의 네이티브 기타 오디오 엔진.
 @MainActor
 final class NativeAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtocol {
-    private let engine = AVAudioEngine()
-    private let mixer = AVAudioMixerNode()
-    private let reverb = AVAudioUnitReverb()
-    private let samplers = (0..<GuitarFingering.stringCount).map { _ in AVAudioUnitSampler() }
+    // 미디어 서비스가 리셋되면 아래 객체들은 전부 무효가 되어 **새로 만드는 것 말고는 방법이 없다.**
+    // `let`이 아닌 이유가 그것이다. (ROADMAP 태스크 A4 · `rebuildEngine()`)
+    private var engine = AVAudioEngine()
+    private var mixer = AVAudioMixerNode()
+    private var reverb = AVAudioUnitReverb()
+    private var samplers = (0..<GuitarFingering.stringCount).map { _ in AVAudioUnitSampler() }
 
     override init() {
         super.init()
@@ -46,6 +48,25 @@ final class NativeAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtocol 
 
     override func performStop() {
         engine.stop()
+    }
+
+    override var isEngineRunning: Bool { engine.isRunning }
+
+    /// 엔진·노드를 전부 버리고 새로 만든다. (ROADMAP 태스크 A4)
+    ///
+    /// 미디어 서비스가 리셋되면 기존 `AVAudioEngine`과 붙어 있던 노드는 살릴 수 없다.
+    /// 재연결만으로는 안 되고 **객체부터 새로 만들어야** 한다.
+    override func rebuildEngine() {
+        engine.stop()
+
+        engine = AVAudioEngine()
+        mixer = AVAudioMixerNode()
+        reverb = AVAudioUnitReverb()
+        samplers = (0..<GuitarFingering.stringCount).map { _ in AVAudioUnitSampler() }
+
+        isSetUp = false
+        setupEngine()
+        performStart()
     }
 
     override func playNote(stringIndex: Int, note: Int, velocity: UInt8) {

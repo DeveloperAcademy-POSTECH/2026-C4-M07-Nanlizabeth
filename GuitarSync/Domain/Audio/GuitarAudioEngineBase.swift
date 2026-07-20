@@ -17,14 +17,20 @@ class GuitarAudioEngineBase {
     private var scheduledStopWorkItems = Array<DispatchWorkItem?>(repeating: nil, count: GuitarFingering.stringCount)
     var isSetUp = false
 
+    /// 전화·이어폰 분리 같은 사건에서 엔진을 되살리는 감시자. (ROADMAP 태스크 A4)
+    private let sessionController = AudioSessionController()
+
     // MARK: - Lifecycle
 
     func start() {
+        // 감시를 먼저 건다 — 그래야 셋업 도중에 들어온 중단도 놓치지 않는다.
+        sessionController.activate(for: self)
         setupEngine()
         performStart()
     }
 
     func stop() {
+        sessionController.deactivate()
         stopAllStrings()
         performStop()
     }
@@ -54,6 +60,24 @@ class GuitarAudioEngineBase {
     /// 지정한 현의 샘플러에서 노트를 멈춘다. 서브클래스에서 반드시 오버라이드한다.
     func stopNote(stringIndex: Int, note: Int) {
         fatalError("Subclasses must override stopNote(stringIndex:note:)")
+    }
+
+    /// 엔진이 실제로 돌고 있는지. **재개가 성공했는지 판단하는 데 쓴다.**
+    ///
+    /// 기본값이 `false`라 오버라이드를 잊으면 재개할 때마다 그래프를 새로 만든다 —
+    /// 느릴 뿐 소리는 나므로, 조용히 죽는 것보다 안전한 쪽으로 기울여 둔다.
+    var isEngineRunning: Bool { false }
+
+    /// 그래프를 통째로 새로 만든다. (미디어 서비스 리셋·재개 실패 시)
+    ///
+    /// 기본 구현은 기존 훅만 다시 밟는다. **엔진 객체 자체가 무효가 되는 프레임워크**
+    /// (AVAudioEngine·AudioKit 둘 다 해당)는 서브클래스에서 오버라이드해
+    /// 객체를 새로 만든 뒤 `super`를 부르지 말고 직접 셋업해야 한다.
+    func rebuildEngine() {
+        performStop()
+        isSetUp = false
+        setupEngine()
+        performStart()
     }
 
     // MARK: - Note helpers
@@ -176,17 +200,12 @@ class GuitarAudioEngineBase {
 
     // MARK: - Shared configuration
 
+    /// 세션 설정은 `AudioSessionController`가 단독으로 책임진다. (ROADMAP 태스크 A4)
+    ///
+    /// 카테고리·버퍼 길이를 여기저기서 바꾸면 나중에 누가 마지막으로 덮었는지 추적이 안 되므로,
+    /// **설정하는 곳을 한 군데로 묶어 뒀다.**
     func configureAudioSession() {
-        #if os(iOS)
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try session.setPreferredIOBufferDuration(0.005)
-            try session.setActive(true)
-        } catch {
-            logAudioError("Failed to configure audio session: \(error.localizedDescription)")
-        }
-        #endif
+        sessionController.configureSession()
     }
 
     private func sequenceVelocity(baseVelocity: UInt8, stringIndex: Int, offset: Int) -> UInt8 {
@@ -205,5 +224,41 @@ class GuitarAudioEngineBase {
         #if DEBUG
         print("[GuitarAudioEngine] \(message)")
         #endif
+    }
+}
+
+// MARK: - AudioSessionRecoverable
+
+/// 소리가 죽는 상황에서의 복구 절차. 두 엔진이 그대로 물려받는다. (ROADMAP 태스크 A4)
+extension GuitarAudioEngineBase: AudioSessionRecoverable {
+    func cutSoundingNotes() {
+        stopAllStrings()
+    }
+
+    func suspendForInterruption() {
+        stopAllStrings()
+        performStop()
+    }
+
+    func resumeAfterInterruption() {
+        // 셋업 전이면 정상 경로로 처음부터 켠다.
+        guard isSetUp else {
+            start()
+            return
+        }
+
+        performStart()
+
+        // 경로가 바뀌어 하드웨어 포맷이 달라지면 기존 연결이 무효라 `start()`가 조용히 실패한다.
+        // **여기서 확인하지 않으면 소리가 안 나는 채로 앱이 멀쩡해 보인다.**
+        guard !isEngineRunning else { return }
+
+        logAudioError("재개 실패 — 그래프를 새로 만든다.")
+        rebuildEngine()
+    }
+
+    func rebuildAudioGraph() {
+        stopAllStrings()
+        rebuildEngine()
     }
 }
