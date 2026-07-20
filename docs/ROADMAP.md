@@ -205,7 +205,7 @@ flowchart LR
 
 | ID | 태스크 | 하는 일 | 관련 계약 | 선행 | 크기 |
 |----|--------|--------|----------|------|------|
-| H1 | 발음 햅틱 연결 | `notePlayed`/`strumPerformed` → 세기별 햅틱. `HapticsManager` **이미 있음, 연결만** | §3.11 | C3, C4 | S |
+| H1 | 발음 햅틱 연결 | `notePlayed`/`strumPerformed` → 세기별 햅틱. `HapticsManager` **이미 있음, 연결만** | §3.11 | C3, C4 | ✅ 완료 (`NotePlayedHaptics` · 넥 연결) |
 | H2 | Core Haptics 감쇠 | `UIImpactFeedbackGenerator` → `CHHapticEngine` 승격. 연속 이벤트 + 강도 감쇠 곡선으로 "줄이 잦아드는" 진동 | §3.11 | H1 | M |
 | H3 | 판정 햅틱 | 목표 코드 vs 현재 운지 비교 → 틀리면 강한 진동. 적용 범위는 SPEC §8 결정 대기 | §3.11, §3.3 | C3, H1 | M |
 | H4 | 접근성 전반 | VoiceOver 라벨 · 다이내믹 타입 · 모션 줄이기 대응 | — | U1~U7 | M |
