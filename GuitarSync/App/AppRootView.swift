@@ -17,6 +17,9 @@ struct AppRootView: View {
     /// 여기에 둔다. 실제 연주에 물리는 건 L5(코디네이터)에서.
     @StateObject private var strumSelect = StrumSelectViewModel()
 
+    /// 진행 선택(U5)·커스텀(U6)이 한 라이브러리를 공유하도록 묶은 것.
+    @StateObject private var progression = ProgressionFlowModel()
+
     /// ⚠️ 프로토타입 잔재. 넥·스트럼 화면(U2·U3)이 완성되면 이 뷰모델과
     /// `Features/Shared/` 폴더 전체가 사라진다.
     @StateObject private var prototypeViewModel = ScreenshotPrototypeViewModel()
@@ -89,14 +92,19 @@ struct AppRootView: View {
             )
 
         case .progressionSelect:
-            ChordProgressionScreen(
-                selectedRoot: $prototypeViewModel.selectedChordRoot,
+            ProgressionSelectScreen(
+                viewModel: progression.select,
                 onBack: router.back,
-                onConfirm: router.back
+                onConfirm: router.back,
+                onCreateCustom: { router.navigate(to: .progressionCustom) }
             )
 
         case .progressionCustom:
-            ProgressionCustomScreen()
+            ProgressionCustomScreen(
+                viewModel: progression.custom,
+                onBack: router.back,
+                onSaved: router.back
+            )
 
         case .peerGuide:
             PeerGuideScreen(viewModel: peerConnect)
