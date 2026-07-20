@@ -163,7 +163,18 @@ final class AppRouter: ObservableObject {
     /// 온보딩을 끝내고 기기에 맞는 메인 화면으로 보낸다.
     func completeOnboarding(deviceType: DeviceType = DeviceInfoProvider.currentDeviceType) {
         onboardingStore.markOnboardingCompleted()
-        replaceRoot(with: PeerRolePolicy.role(for: deviceType) == .strumming ? .strum : .neck)
+        replaceRoot(with: homeRoute)
+    }
+
+    /// 이 기기의 **메인 연주 화면** — iPad는 스트럼, 그 외는 기타넥. (앱을 켰을 때·연결 후 돌아갈 곳)
+    var homeRoute: AppRoute {
+        PeerRolePolicy.role(for: deviceType) == .strumming ? .strum : .neck
+    }
+
+    /// 연결이 끝났을 때처럼 **연결 흐름을 마치고 메인 화면으로** 돌아간다.
+    /// 기록을 지워서, 돌아간 뒤 뒤로가기로 기기 찾기 화면이 다시 나오지 않게 한다.
+    func returnHome() {
+        replaceRoot(with: homeRoute)
     }
 }
 

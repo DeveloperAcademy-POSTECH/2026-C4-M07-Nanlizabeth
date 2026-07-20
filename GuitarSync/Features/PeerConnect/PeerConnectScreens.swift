@@ -145,6 +145,16 @@ struct PeerBrowseScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { viewModel.startBrowsing() }
         .onDisappear { if !viewModel.isConnected { viewModel.stop() } }
+        // 연결되면 "연결됐어요"를 잠깐 보여준 뒤 원래 연주 화면으로 자연스럽게 돌아간다.
+        .onChange(of: viewModel.isConnected) { _, connected in
+            guard connected else { return }
+            Task {
+                try? await Task.sleep(for: .seconds(1.3))
+                // 그새 사용자가 딴 데로 갔으면 끌어오지 않는다.
+                guard router.currentRoute == .peerBrowse else { return }
+                router.returnHome()
+            }
+        }
     }
 
     @ViewBuilder
