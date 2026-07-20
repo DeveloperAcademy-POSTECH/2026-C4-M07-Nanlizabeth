@@ -22,13 +22,7 @@ struct ScreenshotPrototypeView: View {
         case .strumSelect:
             StrumSelectScreen(
                 onBack: viewModel.backToMain,
-                onConfirm: viewModel.backToMain,
-                onCreate: viewModel.openStrumCreate
-            )
-        case .strumCreate:
-            StrumCreateScreen(
-                onBack: viewModel.backToStrumSelect,
-                onConfirm: viewModel.backToStrumSelect
+                onConfirm: viewModel.backToMain
             )
         case .chordProgression:
             ChordProgressionScreen(

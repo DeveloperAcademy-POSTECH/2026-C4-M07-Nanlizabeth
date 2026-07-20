@@ -93,7 +93,6 @@ GuitarSync/
 │   ├── Neck/                        ScreenshotFretboardView
 │   ├── Strum/                       GuitarStrumView + ViewModel + 줄 입력/이미지 뷰
 │   ├── StrokeSelect/                StrumSelectScreen
-│   ├── StrokeCreate/                StrumCreateScreen
 │   ├── ProgressionSelect/           ChordProgressionScreen
 │   ├── ProgressionCustom/           [새로]
 │   ├── PeerConnect/                 [새로] 가이드 + 근처 기기 찾기
@@ -260,7 +259,7 @@ GuitarSync/
 
 | 프로토콜 | 명세 |
 |------|------|
-| `StrumPatternLibraryProtocol` | `presets: [StrumPattern]`, `customs: [StrumPattern]`, `saveCustom(_:)`, `deleteCustom(id:)` |
+| `StrumPatternLibraryProtocol` | `presets: [StrumPattern]`, `pattern(id:)` — **읽기 전용.** 주법 커스텀은 범위에서 제외됨(2026-07-20) |
 | `StrumPatternPlayerProtocol` | `play(pattern:looping:)`, `stop()` — 클럭(§3.2) 구독, 각 step 시점에 현재 운지로 오디오 호출. `strumPerformed` 이벤트 방송(UI 표시용) |
 
 - **만드는 사람:** 계약+플레이어는 로직 담당, 프리셋 데이터는 리서치 담당 · **쓰는 사람:** 스트로크 선택 화면, 모드 A, 미리듣기

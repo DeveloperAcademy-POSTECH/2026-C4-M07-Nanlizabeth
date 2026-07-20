@@ -126,22 +126,22 @@ struct StrumPattern: Equatable, Codable, Identifiable {
 
 // MARK: - 라이브러리 계약
 
-/// 주법 목록을 갖고 있고 커스텀을 저장하는 곳. (ARCHITECTURE §3.5)
+/// 주법 목록을 갖고 있는 곳. (ARCHITECTURE §3.5)
+///
+/// - Important: **주법은 커스텀을 지원하지 않습니다** (2026-07-20 결정). 프리셋 읽기 전용입니다.
+///   사용자가 직접 만드는 건 **코드진행뿐**입니다 (`ChordProgressionLibraryProtocol`).
+///   초보자가 리듬을 처음부터 만드는 건 난이도가 높고, 프리셋 리서치(CT1)로 충분하다고 판단했습니다.
 @MainActor
 protocol StrumPatternLibraryProtocol: AnyObject {
     /// 기본 제공 주법 (`Content/StrumPresetData.swift`).
     var presets: [StrumPattern] { get }
-    /// 사용자가 만든 주법.
-    var customs: [StrumPattern] { get }
 
-    func saveCustom(_ pattern: StrumPattern)
-    func deleteCustom(id: UUID)
     func pattern(id: UUID) -> StrumPattern?
 }
 
 extension StrumPatternLibraryProtocol {
-    /// 선택 화면이 보여주는 전체 목록.
-    var allPatterns: [StrumPattern] { presets + customs }
+    /// 선택 화면이 보여주는 목록. 주법은 프리셋이 전부다.
+    var allPatterns: [StrumPattern] { presets }
 }
 
 // MARK: - 플레이어 계약
@@ -176,24 +176,10 @@ struct StrumPerformedEvent: Equatable {
 /// **스트로크 선택 화면(U4)을 진짜 데이터 없이 완성할 수 있게** 한다.
 @MainActor
 final class MockStrumPatternLibrary: StrumPatternLibraryProtocol, ObservableObject {
-    @Published private(set) var customs: [StrumPattern] = []
-
     let presets: [StrumPattern]
 
     init(presets: [StrumPattern]? = nil) {
         self.presets = presets ?? Self.stubPresets
-    }
-
-    func saveCustom(_ pattern: StrumPattern) {
-        if let index = customs.firstIndex(where: { $0.id == pattern.id }) {
-            customs[index] = pattern
-        } else {
-            customs.append(pattern)
-        }
-    }
-
-    func deleteCustom(id: UUID) {
-        customs.removeAll { $0.id == id }
     }
 
     func pattern(id: UUID) -> StrumPattern? {

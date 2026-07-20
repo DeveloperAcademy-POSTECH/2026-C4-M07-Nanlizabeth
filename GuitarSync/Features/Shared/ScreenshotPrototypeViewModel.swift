@@ -89,14 +89,6 @@ final class ScreenshotPrototypeViewModel: ObservableObject {
         screen = .main
     }
 
-    func openStrumCreate() {
-        screen = .strumCreate
-    }
-
-    func backToStrumSelect() {
-        screen = .strumSelect
-    }
-
     func selectFingerNumber(_ number: Int) {
         selectedFingerNumber = number
         multipeerService.send(.fingerNumber(number))

@@ -11,8 +11,6 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
     case strum
     /// 4. 스트로크 선택 — 프리셋 주법 목록
     case strokeSelect
-    /// 5. 스트로크 생성 — 커스텀 주법 만들기
-    case strokeCreate
     /// 6. 코드진행 선택 — 프리셋 진행 목록
     case progressionSelect
     /// 7. 코드진행 커스텀 — 카탈로그에서 코드 골라 배치 + 미리듣기
@@ -33,7 +31,6 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
         case .neck: return "기타넥"
         case .strum: return "스트럼"
         case .strokeSelect: return "스트로크 선택"
-        case .strokeCreate: return "스트로크 만들기"
         case .progressionSelect: return "코드진행 선택"
         case .progressionCustom: return "코드진행 만들기"
         case .peerGuide: return "연결 안내"

@@ -32,7 +32,6 @@ struct AppRootView: View {
             switch screen {
             case .main: break
             case .strumSelect: router.navigate(to: .strokeSelect)
-            case .strumCreate: router.navigate(to: .strokeCreate)
             case .chordProgression: router.navigate(to: .progressionSelect)
             }
         }
@@ -57,13 +56,6 @@ struct AppRootView: View {
 
         case .strokeSelect:
             StrumSelectScreen(
-                onBack: router.back,
-                onConfirm: router.back,
-                onCreate: { router.navigate(to: .strokeCreate) }
-            )
-
-        case .strokeCreate:
-            StrumCreateScreen(
                 onBack: router.back,
                 onConfirm: router.back
             )

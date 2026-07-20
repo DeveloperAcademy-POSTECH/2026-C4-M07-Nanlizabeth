@@ -6,7 +6,6 @@ enum PrototypeMode {
 enum PrototypeScreen {
     case main
     case strumSelect
-    case strumCreate
     case chordProgression
 }
 
