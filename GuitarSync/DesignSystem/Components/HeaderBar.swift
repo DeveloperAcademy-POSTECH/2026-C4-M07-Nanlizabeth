@@ -30,12 +30,14 @@ struct HeaderBar: View {
                 Spacer()
 
                 if let onConfirm {
+                    // 확정 버튼은 형광색 — HI-FI `스트로크 선택 페이지` 기준.
+                    // (이 컴포넌트를 쓰는 3개 화면에 함께 반영된다)
                     Button(action: onConfirm) {
                         Image(systemName: "checkmark")
                             .font(.gsFixed(28, weight: .bold))
-                            .foregroundStyle(Color.gsOnAccent.opacity(0.78))
+                            .foregroundStyle(Color.gsOnAccent)
                             .frame(width: 46, height: 46)
-                            .background(Circle().fill(Color.gsTextPrimary.opacity(0.72)))
+                            .background(Circle().fill(Color.gsAccent))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("확정")
