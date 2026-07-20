@@ -10,9 +10,13 @@ import Foundation
 /// 프로젝트가 정상적으로 컴파일되도록 한다.
 @MainActor
 final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtocol {
-    private let engine = AudioEngine()
-    private let samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
+    // 미디어 서비스 리셋 뒤에는 새로 만들어야 하므로 `var`다. (ROADMAP 태스크 A4 · `rebuildEngine()`)
+    private var engine = AudioEngine()
+    private var samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
     private lazy var mixer = Mixer(samplers.map { $0 as Node })
+
+    /// 샘플러 6개가 전부 사운드폰트를 물고 있는가. (네이티브 엔진과 같은 이유 — `NativeAudioEngine` 참고)
+    private var isSoundFontLoaded = false
 
     override init() {
         super.init()
@@ -30,6 +34,10 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
     }
 
     override func performStart() {
+        if !isSoundFontLoaded {
+            loadSoundFont()
+        }
+
         do {
             try engine.start()
         } catch {
@@ -37,8 +45,30 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
         }
     }
 
+    /// ⚠️ **`stop()`이 아니라 `pause()`인 이유는 네이티브 엔진과 같다** —
+    /// 완전히 멈추면 샘플러가 사운드폰트를 잃어 다시 켰을 때 **사인파**가 난다.
     override func performStop() {
+        engine.pause()
+    }
+
+    override var isEngineRunning: Bool { engine.avEngine.isRunning }
+
+    /// 엔진·샘플러·믹서를 전부 버리고 새로 만든다. (ROADMAP 태스크 A4)
+    ///
+    /// AudioKit의 `AudioEngine`도 내부적으로 `AVAudioEngine`을 쓰므로,
+    /// 미디어 서비스 리셋 뒤에는 네이티브와 똑같이 객체부터 새로 만들어야 한다.
+    override func rebuildEngine() {
         engine.stop()
+
+        engine = AudioEngine()
+        samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
+        mixer = Mixer(samplers.map { $0 as Node })
+
+        // 샘플러가 새것이라 음색은 아직 안 들어 있다.
+        isSoundFontLoaded = false
+        isSetUp = false
+        setupEngine()
+        performStart()
     }
 
     override func playNote(stringIndex: Int, note: Int, velocity: UInt8) {
@@ -61,6 +91,8 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
             return
         }
 
+        var loadedCount = 0
+
         for sampler in samplers {
             do {
                 try sampler.samplerUnit.loadSoundBankInstrument(
@@ -70,10 +102,13 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
                     bankLSB: 0
                 )
                 configureSamplerExpression(sampler)
+                loadedCount += 1
             } catch {
                 logAudioError("Failed to load AcousticGuitar.sf2: \(error.localizedDescription)")
             }
         }
+
+        isSoundFontLoaded = loadedCount == samplers.count
     }
 
     private func configureSamplerExpression(_ sampler: AppleSampler) {
