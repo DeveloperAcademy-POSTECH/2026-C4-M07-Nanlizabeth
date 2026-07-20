@@ -303,8 +303,26 @@ GuitarSync/
 | 시작 규칙 | 첫 실행 → `.onboarding` · iPhone → `.neck` · iPad → `.strum`(+연결 유도) |
 
 - **규칙: 화면 전환은 반드시 라우터로.** 뷰 안에서 직접 다른 화면을 띄우지 않기.
-- 기존 `ScreenshotPrototypeViewModel`의 `screen` 전환 로직이 이것의 씨앗 — 라우터로 승격.
 - 🗣️ *쉬운 설명: 건물 안내데스크. 모든 이동은 데스크를 거친다. 그래야 "그 화면 어떻게 여는 거예요?"라는 질문이 사라진다.*
+
+#### ✅ 구현 완료 (2026-07-20, 태스크 F3)
+
+- `App/AppRouter.swift` — `AppRoute`(9개) · `navigate/back/replaceRoot` · 시작 규칙 · `OnboardingStore`
+- `App/AppRootView.swift` — **화면을 그리는 유일한 곳.** U 레인은 여기서 자기 case 한 줄만 바꾸면 된다
+- 아직 안 만든 화면 4개는 `ScreenPlaceholder`가 자리를 잡고 있다 (담당 태스크 번호가 화면에 표시됨)
+
+> 🛠️ **화면 개발 단축키:** 실행 인자 `-startRoute <이름>`을 주면 그 화면으로 바로 뜬다.
+> 매번 클릭해서 들어갈 필요가 없다.
+> ```
+> Xcode  → Scheme → Run → Arguments에  -startRoute progressionCustom
+> 명령줄 → xcrun simctl launch <device> <bundle-id> -startRoute peerGuide
+> ```
+> 이름은 `AppRoute`의 case 이름 그대로 (`onboarding`, `neck`, `strum`, `strokeSelect`,
+> `strokeCreate`, `progressionSelect`, `progressionCustom`, `peerGuide`, `peerBrowse`). DEBUG 빌드 전용.
+
+> ⚠️ **프로토타입 다리 (임시):** 넥·스트럼은 아직 프로토타입 화면 하나에 같이 들어 있고,
+> 그 화면은 자체 `screen` 값으로 이동한다. `AppRootView`가 그걸 라우터 이동으로 옮겨주고 있다.
+> **U2(넥)·U3(스트럼)가 완성되면 이 다리와 `Features/Shared/` 폴더 전체가 사라진다.**
 
 ### 3.10 온보딩·시스템 안내 [새로] — Features/Onboarding + Domain
 
