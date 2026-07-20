@@ -98,14 +98,18 @@ struct NeckScreen: View {
     private var strings: some View {
         ForEach(Array(NeckGeometry.stringYs.enumerated()), id: \.offset) { index, y in
             let thickness = NeckGeometry.stringThickness(index)
-            let isFlashing = viewModel.flashingStrings.contains(index)
+            // 방금 울린 세기(0~1). 없으면 0 = 가만히.
+            let intensity = viewModel.stringIntensity[index] ?? 0
 
             GuitarStringLine(thickness: thickness)
                 .frame(width: NeckGeometry.stage.width, height: thickness + 3)
+                // 세게 칠수록 굵게 부풀었다 가라앉는다 — 떨림의 착시.
+                .scaleEffect(x: 1, y: 1 + intensity * 0.9, anchor: .center)
                 .position(x: stageCenterX, y: y)
-                .shadow(color: .white.opacity(isFlashing ? 0.85 : 0), radius: 7)
+                // 세기에 비례한 글로우.
+                .shadow(color: .white.opacity(intensity * 0.85), radius: 4 + intensity * 8)
         }
-        .animation(.easeOut(duration: 0.18), value: viewModel.flashingStrings)
+        .animation(.easeOut(duration: 0.16), value: viewModel.stringIntensity)
     }
 
     /// 지금 짚고 있는 자리. 손끝에 가리지 않도록 칸 한가운데에 크게 찍는다.
