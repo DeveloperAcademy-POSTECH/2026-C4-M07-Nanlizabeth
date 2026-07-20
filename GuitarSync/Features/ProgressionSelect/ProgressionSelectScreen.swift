@@ -41,6 +41,7 @@ struct ProgressionSelectScreen: View {
                 .padding(.bottom, Spacing.lg)
             }
         }
+        .onDisappear { viewModel.stopPreview() }
     }
 }
 

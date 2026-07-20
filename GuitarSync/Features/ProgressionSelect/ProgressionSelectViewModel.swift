@@ -12,12 +12,17 @@ final class ProgressionSelectViewModel: ObservableObject {
     @Published private(set) var selectedID: UUID?
 
     let library: ChordProgressionLibraryProtocol
+    private let preview: ProgressionPreviewPlayerProtocol
 
     private var cancellable: AnyCancellable?
 
-    init(library: ChordProgressionLibraryProtocol? = nil) {
+    init(
+        library: ChordProgressionLibraryProtocol? = nil,
+        preview: ProgressionPreviewPlayerProtocol? = nil
+    ) {
         let resolved = library ?? ChordProgressionLibrary()
         self.library = resolved
+        self.preview = preview ?? ProgressionPreviewPlayer(engine: GuitarAudioEngineFactory.makeDefault())
 
         // 커스텀 화면(U6)에서 새 진행을 저장하면 라이브러리의 customs가 바뀐다.
         // 그걸 이 화면에 흘려보내 목록이 저절로 갱신되게 한다.
@@ -44,7 +49,14 @@ final class ProgressionSelectViewModel: ObservableObject {
         progression.id == selectedID
     }
 
+    /// 고르면 그 진행을 **기본 주법·BPM으로 짧게 들려준다** (한 번에 하나만).
     func select(_ progression: ChordProgression) {
         selectedID = progression.id
+        preview.preview(progression)
+    }
+
+    /// 화면을 벗어날 때 미리듣기를 멈춘다.
+    func stopPreview() {
+        preview.stopPreview()
     }
 }

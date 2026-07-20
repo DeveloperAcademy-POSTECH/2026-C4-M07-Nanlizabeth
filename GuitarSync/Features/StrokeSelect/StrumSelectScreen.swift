@@ -28,6 +28,7 @@ struct StrumSelectScreen: View {
 
             patternGrid
         }
+        .onDisappear { viewModel.stopPreview() }
     }
 
     /// 박자 필터. 박자가 한 종류뿐이면 아예 안 나온다.
