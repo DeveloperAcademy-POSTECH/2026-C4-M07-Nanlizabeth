@@ -21,11 +21,17 @@ final class ChordModeController: ObservableObject {
 
     private let session: ChordPracticeSession
 
+    /// 판정 햅틱 (H3). **기본은 꺼짐(target=nil)** — 모드 A엔 정답이 없기 때문 (SPEC §8).
+    /// "이 코드를 짚어보세요" 식의 목표가 정해지면 `setTargetChord(_:)`로 켠다.
+    private let judgment = ChordJudgmentController()
+
     init(engine: GuitarAudioEngineProtocol? = nil, clock: BeatClockProtocol? = nil) {
         let engine = engine ?? GuitarAudioEngineFactory.makeDefault()
         let session = ChordPracticeSession(engine: engine, clock: clock)
 
         self.session = session
+        // 판정기를 넥의 운지 변화에 물려둔다. target이 없으면 아무 일도 안 한다.
+        judgment.connect(to: session.fingeringState.fingeringChanged)
         // 넥은 세션의 운지상태를 공유하고, 엔진 수명은 세션이 관리하므로 넥엔 넘기지 않는다(nil).
         // 피드백은 세션의 합친 스트림 — 자동으로 긁힌 줄도 떨리고 진동한다.
         self.neck = NeckViewModel(
@@ -61,5 +67,11 @@ final class ChordModeController: ObservableObject {
     func stop() {
         session.stopPlaying()
         isPlaying = false
+    }
+
+    /// "이 코드를 짚어보세요" 목표를 정한다. 정하면 다른 코드를 짚을 때 진동으로 알려준다 (H3).
+    /// `nil`이면 판정을 끈다. (연습 화면이 도입되면 여기에 목표를 넣는다 — SPEC §8 결정 후.)
+    func setTargetChord(_ chord: GuitarChord?) {
+        judgment.target = chord
     }
 }
