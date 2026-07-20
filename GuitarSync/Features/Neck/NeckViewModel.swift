@@ -16,17 +16,18 @@ final class NeckViewModel: ObservableObject {
     /// 지금 손가락이 닿아 있는 칸. 짚은 자리 점을 그리는 데 쓴다.
     @Published private(set) var activePresses: Set<FretPress> = []
 
-    /// 방금 울린 줄들. 짧게 반짝였다 사라진다.
+    /// 방금 울린 줄의 **세기(0~1)**. 줄이 얼마나 세게 떨리고 빛나는지에 그대로 쓴다.
+    /// 값이 있으면 떨리는 중, 사라지면 잦아든 것.
     ///
-    /// - Note: U3의 줄 애니메이션과 H1의 햅틱이 **같은 `notePlayed` 이벤트**를 쓴다.
-    ///   여기 반짝임은 U2 범위의 최소 피드백이고, 본격적인 줄 떨림은 U3에서 온다.
-    @Published private(set) var flashingStrings: Set<Int> = []
+    /// - Note: U3의 줄 애니메이션과 H1의 햅틱이 **같은 `notePlayed` 이벤트**를 쓴다 (SPEC §5).
+    @Published private(set) var stringIntensity: [Int: Double] = [:]
 
-    /// 반짝임이 남아 있는 시간.
-    private let flashDuration: Duration = .milliseconds(320)
+    /// 떨림이 잦아드는 시간. 세게 칠수록 조금 더 오래 남는다.
+    private let baseFlashDuration: Double = 0.32
 
     private let fingeringState: FingeringStateProtocol
     private let audioEngine: GuitarAudioEngineProtocol?
+    private let haptics = NotePlayedHaptics()
     private var cancellables: Set<AnyCancellable> = []
     private var flashTasks: [Int: Task<Void, Never>] = [:]
 
@@ -53,6 +54,7 @@ final class NeckViewModel: ObservableObject {
         self.audioEngine = audioEngine
         self.fingering = fingeringState.currentFingering
         subscribe()
+        haptics.connect(to: fingeringState.notePlayed)   // H1 — 짚으면 세기별 진동
     }
 
     // MARK: - 화면 수명주기
@@ -92,20 +94,24 @@ final class NeckViewModel: ObservableObject {
 
         fingeringState.notePlayed
             .sink { [weak self] event in
-                self?.flash(stringIndex: event.stringIndex)
+                self?.flash(stringIndex: event.stringIndex, velocity: event.velocity)
             }
             .store(in: &cancellables)
     }
 
-    /// 줄 하나를 잠깐 반짝이게 한다. 같은 줄이 연달아 울리면 타이머를 다시 시작한다.
-    private func flash(stringIndex: Int) {
+    /// 줄 하나를 세기만큼 떨리게 한다. 같은 줄이 연달아 울리면 타이머를 다시 시작한다.
+    private func flash(stringIndex: Int, velocity: UInt8) {
         flashTasks[stringIndex]?.cancel()
-        flashingStrings.insert(stringIndex)
 
-        flashTasks[stringIndex] = Task { [weak self, flashDuration] in
-            try? await Task.sleep(for: flashDuration)
+        let intensity = min(max(Double(velocity) / 127.0, 0.2), 1.0)
+        stringIntensity[stringIndex] = intensity
+        // 세게 칠수록 여운이 조금 더 길다.
+        let duration = baseFlashDuration * (0.7 + 0.6 * intensity)
+
+        flashTasks[stringIndex] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled else { return }
-            self?.flashingStrings.remove(stringIndex)
+            self?.stringIntensity[stringIndex] = nil
             self?.flashTasks[stringIndex] = nil
         }
     }
