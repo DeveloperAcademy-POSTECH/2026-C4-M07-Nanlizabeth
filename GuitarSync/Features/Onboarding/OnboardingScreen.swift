@@ -24,7 +24,7 @@ struct OnboardingScreen: View {
             Button("건너뛰고 시작하기") {
                 router.completeOnboarding()
             }
-            .font(.gsButton)
+            .font(.gsHeadline)
             .foregroundStyle(Color.gsTextOnLight)
             .padding(.horizontal, Spacing.xl)
             .padding(.vertical, Spacing.sm)

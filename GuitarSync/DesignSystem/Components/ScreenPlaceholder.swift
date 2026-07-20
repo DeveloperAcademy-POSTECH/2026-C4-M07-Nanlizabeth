@@ -37,7 +37,7 @@ struct ScreenPlaceholder: View {
 
                 if let hint {
                     Text(hint)
-                        .font(.gsLabel)
+                        .font(.gsCaption)
                         .foregroundStyle(Color.gsTextTertiary)
                         .multilineTextAlignment(.center)
                         .padding(.top, Spacing.xxs)
@@ -46,7 +46,7 @@ struct ScreenPlaceholder: View {
 
             if router.canGoBack {
                 Button("뒤로") { router.back() }
-                    .font(.gsButton)
+                    .font(.gsHeadline)
                     .foregroundStyle(Color.gsTextPrimary)
                     .padding(.horizontal, Spacing.lg)
                     .padding(.vertical, Spacing.sm)

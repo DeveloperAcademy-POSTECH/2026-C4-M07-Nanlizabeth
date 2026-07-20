@@ -2,80 +2,76 @@ import SwiftUI
 
 /// 앱이 쓰는 **모든 색.** (ARCHITECTURE §5 규약: 색을 화면에서 직접 만들지 않는다)
 ///
-/// ## ⏳ 지금 값은 임시입니다 (태스크 F2 진행 중)
+/// ## 출처 (2026-07-20, 태스크 F2)
 ///
-/// 아래 값은 **기존 프로토타입 코드에 흩어져 있던 색을 모아 이름만 붙인 것**입니다.
-/// Figma HI-FI의 '디자인 스타일'을 확보하면 **이 파일의 숫자만** 바꿉니다 —
-/// 화면 코드는 이름으로 참조하므로 한 줄도 안 고쳐도 됩니다. 그게 토큰을 쓰는 이유입니다.
+/// Figma `C4-난리자베스` → `Hi-Fi` 섹션에서 추출했습니다.
+/// - **면 색**은 HI-FI 화면(`코드 모드 - 기본`, `스트로크 선택 페이지`)을 렌더해 픽셀에서 직접 뽑음
+/// - **글자·구분선 색**은 Figma 변수(Apple `Labels - Vibrant` 계열)에서 가져옴
+///
+/// 디자인이 Apple 기본 디자인 시스템(SF Pro + Liquid Glass) 위에 얹혀 있어서,
+/// 커스텀 값은 **면 색 4개와 액센트 1개**뿐입니다.
 ///
 /// ## 쓰는 법
 ///
 /// ```swift
-/// Color.gsStageBackground          // ✅
-/// Color(red: 0.02, green: 0.04, blue: 0.045)   // ❌ 숫자 직접 쓰기 금지
+/// Color.gsAccent                               // ✅
+/// Color(red: 0.91, green: 1.0, blue: 0.07)     // ❌ 숫자 직접 쓰기 금지
 /// ```
 enum ColorTokens {
 
-    // MARK: - 배경
+    // MARK: - 액센트 ★이 앱의 시그니처
 
-    /// 앱 전체 바탕. 거의 검정에 가까운 청록빛 어둠.
-    static let stageBackground = Color(red: 0.02, green: 0.04, blue: 0.045)
-    /// 연주 화면(스트럼)의 바탕 — 스테이지보다 아주 약간 밝다.
-    static let performanceBackground = Color(red: 0.03, green: 0.04, blue: 0.045)
-    /// 카드·팝오버 등 떠 있는 면.
-    static let surface = Color(red: 0.08, green: 0.09, blue: 0.10)
-    /// 팝오버 위의 강조 면 (BPM 슬라이더 트랙 등).
-    static let surfaceRaised = Color(red: 0.30, green: 0.34, blue: 0.42)
+    /// 형광 라임. **선택됨·활성 상태를 나타내는 유일한 강조색.**
+    ///
+    /// 스트로크/코드 선택 화면에서 고른 항목, 재생 중 표시 등에 쓴다.
+    /// 배경이 거의 검정이라 이 색 하나만으로 시선이 잡힌다 — 남발하면 효과가 죽는다.
+    static let accent = Color(hex: 0xE7FF12)
+    /// 액센트 위에 얹는 글자색. 라임이 매우 밝아서 **반드시 검정**이다.
+    static let onAccent = Color(hex: 0x000000)
 
-    // MARK: - 기타넥 (운지 화면)
+    // MARK: - 배경·면
 
-    /// 지판(프렛보드) 나무면.
-    static let neckSurface = Color(red: 0.08, green: 0.10, blue: 0.12)
-    /// 프렛 쇠줄.
-    static let fretWire = Color(red: 0.72, green: 0.78, blue: 0.85)
-    /// 줄 — 밝게 빛나는 상태.
-    static let stringBright = Color(red: 0.88, green: 0.92, blue: 0.97)
-    /// 줄 — 가라앉은 상태.
-    static let stringDim = Color(red: 0.46, green: 0.53, blue: 0.62)
-
-    // MARK: - 스트럼 (긁는 화면)
-
-    /// 울림통 나무 — 밝은 쪽.
-    static let bodyWoodLight = Color(red: 0.42, green: 0.20, blue: 0.075)
-    /// 울림통 나무 — 중간.
-    static let bodyWoodMid = Color(red: 0.12, green: 0.065, blue: 0.030)
-    /// 울림통 나무 — 어두운 쪽.
-    static let bodyWoodDark = Color(red: 0.10, green: 0.055, blue: 0.025)
-    /// 스트럼 화면의 줄.
-    static let strumString = Color(red: 0.72, green: 0.78, blue: 0.84)
-    /// 줄 이미지 위에 얹는 색조.
-    static let strumStringTint = Color(red: 0.62, green: 0.69, blue: 0.72)
+    /// 앱 전체 바탕. 가장 어두운 면.
+    static let stageBackground = Color(hex: 0x0B0E11)
+    /// 기타넥 지판면. 바탕보다 살짝 밝은 청회색.
+    static let neckSurface = Color(hex: 0x161A20)
+    /// 목록 행·카드처럼 떠 있는 면.
+    static let surface = Color(hex: 0x343639)
+    /// 줄·프렛 등 중간 밝기 요소.
+    static let hardware = Color(hex: 0x52525C)
+    /// 구분선.
+    static let separator = Color(hex: 0x1A1A1A)
 
     // MARK: - 글자
+    //
+    // Apple의 Vibrant 라벨 계열을 따른다 — 어두운 배경에서 순백(#fff)은 눈이 부시므로
+    // Primary도 #f5f5f5를 쓴다.
 
-    static let textPrimary = Color.white
-    static let textSecondary = Color.white.opacity(0.6)
-    static let textTertiary = Color.white.opacity(0.4)
-    /// 밝은 배경 위 글자 (흰 버튼 안 등).
-    static let textOnLight = Color.black
+    static let textPrimary = Color(hex: 0xF5F5F5)
+    static let textSecondary = Color(hex: 0xF5F5F5).opacity(0.6)
+    static let textTertiary = Color(hex: 0x404040)
+    /// 밝은 배경(라임·흰 버튼) 위 글자.
+    static let textOnLight = Color(hex: 0x000000)
 }
 
 extension Color {
+    /// `0xRRGGBB` 형태로 색을 만든다. **토큰 파일 안에서만** 쓴다.
+    fileprivate init(hex: UInt32) {
+        self.init(
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255
+        )
+    }
+
+    static let gsAccent = ColorTokens.accent
+    static let gsOnAccent = ColorTokens.onAccent
+
     static let gsStageBackground = ColorTokens.stageBackground
-    static let gsPerformanceBackground = ColorTokens.performanceBackground
-    static let gsSurface = ColorTokens.surface
-    static let gsSurfaceRaised = ColorTokens.surfaceRaised
-
     static let gsNeckSurface = ColorTokens.neckSurface
-    static let gsFretWire = ColorTokens.fretWire
-    static let gsStringBright = ColorTokens.stringBright
-    static let gsStringDim = ColorTokens.stringDim
-
-    static let gsBodyWoodLight = ColorTokens.bodyWoodLight
-    static let gsBodyWoodMid = ColorTokens.bodyWoodMid
-    static let gsBodyWoodDark = ColorTokens.bodyWoodDark
-    static let gsStrumString = ColorTokens.strumString
-    static let gsStrumStringTint = ColorTokens.strumStringTint
+    static let gsSurface = ColorTokens.surface
+    static let gsHardware = ColorTokens.hardware
+    static let gsSeparator = ColorTokens.separator
 
     static let gsTextPrimary = ColorTokens.textPrimary
     static let gsTextSecondary = ColorTokens.textSecondary

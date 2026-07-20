@@ -12,12 +12,17 @@ import SwiftUI
 enum LayoutTokens {
     /// 모든 화면이 그려지는 기준 도화지 크기 (가로 기준).
     ///
-    /// iPhone 15/16 가로(852×393)를 기준으로 잡았다. 기존 `GuitarLayoutConstants`의
-    /// 고정 수치(넥 760×310, 사운드홀 860×330)가 이 크기를 전제로 설계돼 있다.
+    /// **Figma HI-FI의 iPhone 프레임 크기와 동일하다** (2026-07-20 확인, 태스크 F2).
+    /// iPhone 16 Pro / 17 가로 해상도이기도 해서, 해당 기기에서는 배율이 정확히 1.0이 된다.
     ///
-    /// - Note: ⏳ Figma HI-FI 프레임 크기가 확인되면 그 값으로 교체할 것 (태스크 F2).
-    ///   **이 상수 하나만 바꾸면 전 화면이 함께 따라간다.**
-    static let referenceStage = CGSize(width: 852, height: 393)
+    /// - Note: **이 상수 하나만 바꾸면 전 화면이 함께 따라간다.**
+    /// - Important: ⚠️ Figma에는 **iPad Pro 12.9" 전용 프레임(1366×1024)이 따로 있다.**
+    ///   가로세로비가 iPhone 2.17 : iPad 1.33으로 크게 달라, 이 값 하나를 스케일하는 방식으로는
+    ///   iPad에서 위아래 여백이 크게 남는다. iPad 대응 방침은 **미결정** — ARCHITECTURE §2.5 참고.
+    static let referenceStage = CGSize(width: 874, height: 402)
+
+    /// Figma에 있는 iPad Pro 12.9" 프레임 크기. **아직 코드에서 쓰지 않는다** (대응 방침 미결정).
+    static let iPadReferenceStage = CGSize(width: 1366, height: 1024)
 
     /// 기준 도화지를 실제 스테이지 크기에 맞추기 위한 배율.
     ///
