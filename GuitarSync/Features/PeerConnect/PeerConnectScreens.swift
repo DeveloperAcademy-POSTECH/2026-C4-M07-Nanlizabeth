@@ -92,132 +92,140 @@ struct PeerBrowseScreen: View {
     @ObservedObject var viewModel: PeerConnectViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            HeaderBar(title: "기기 찾기", onBack: { router.back() }, onConfirm: nil)
+        VStack(spacing: Spacing.md) {
+            HeaderBar(title: "기기 연결", onBack: { router.back() }, onConfirm: nil)
 
-            Spacer()
-
-            switch viewModel.flowState {
-            case .connected(let peerName):
-                statusView(
-                    icon: "checkmark.circle.fill",
-                    tint: Color.gsAccent,
-                    title: "\(peerName)와 연결됐어요",
-                    detail: "이제 \(viewModel.partnerRole.displayName)은 상대 기기가 맡습니다."
-                )
-
-            case .failed(let message):
-                statusView(
-                    icon: "exclamationmark.circle.fill",
-                    tint: Color.gsTextSecondary,
-                    title: "연결하지 못했어요",
-                    detail: message
-                )
-
-            case .disconnected:
-                statusView(
-                    icon: "wifi.slash",
-                    tint: Color.gsTextSecondary,
-                    title: "연결이 끊어졌어요",
-                    detail: "다시 찾아볼까요?"
-                )
-
-            default:
-                peerList
+            if viewModel.isConnected {
+                connectedCard
+                    .padding(.horizontal, Spacing.xl)
             }
 
-            Spacer()
-
-            Button(viewModel.isConnected ? "연결 끊기" : "다시 찾기") {
-                if viewModel.isConnected {
-                    viewModel.stop()
-                } else {
-                    viewModel.startBrowsing()
+            if viewModel.isInitiator {
+                // 📱 iPhone(연결 주체) — 찾은 기기 목록을 (연결 중에도) 보여준다.
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text(viewModel.isConnected ? "다른 근처 기기" : "근처 기기")
+                            .font(.gsCaption)
+                            .foregroundStyle(Color.gsTextTertiary)
+                        peerList
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Spacing.xl)
                 }
+            } else if !viewModel.isConnected {
+                // 📲 iPad(보조) — 연결 전엔 대기 안내만. 연결되면 위 카드로 충분.
+                Spacer()
+                waitingView
+                Spacer()
             }
-            .font(.gsHeadline)
-            .foregroundStyle(Color.gsTextPrimary)
-            .padding(.horizontal, Spacing.xl)
-            .frame(minHeight: HitTarget.minimum)
-            .background(Capsule().fill(Color.gsSurface))
-            .padding(.bottom, Spacing.lg)
+
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { viewModel.startBrowsing() }
         .onDisappear { if !viewModel.isConnected { viewModel.stop() } }
-        // 연결되면 "연결됐어요"를 잠깐 보여준 뒤 원래 연주 화면으로 자연스럽게 돌아간다.
+        // 연결되면 "연결됨"을 잠깐 보여준 뒤 원래 연주 화면으로 돌아간다. (다시 오면 위 카드로 상태 확인)
         .onChange(of: viewModel.isConnected) { _, connected in
             guard connected else { return }
             Task {
-                try? await Task.sleep(for: .seconds(1.3))
-                // 그새 사용자가 딴 데로 갔으면 끌어오지 않는다.
+                try? await Task.sleep(for: .seconds(1.5))
                 guard router.currentRoute == .peerBrowse else { return }
                 router.returnHome()
             }
         }
     }
 
-    @ViewBuilder
-    private var peerList: some View {
-        VStack(spacing: Spacing.sm) {
-            if !viewModel.isInitiator {
-                // iPad(스트로크) = 기다리는 쪽. **연결 주체는 항상 iPhone**이므로 목록이 아니라 대기 안내.
-                ProgressView()
-                    .tint(Color.gsTextSecondary)
-                Text("연결을 기다리는 중…")
-                    .font(.gsBody)
-                    .foregroundStyle(Color.gsTextSecondary)
-                Text("상대 iPhone에서 이 기기를 선택하면 연결됩니다")
-                    .font(.gsCaption)
-                    .foregroundStyle(Color.gsTextTertiary)
-            } else if viewModel.discoveredPeers.isEmpty {
-                ProgressView()
-                    .tint(Color.gsTextSecondary)
-                Text("근처 기기를 찾는 중…")
-                    .font(.gsBody)
-                    .foregroundStyle(Color.gsTextSecondary)
-                Text("상대 기기에서도 이 화면을 열어주세요")
-                    .font(.gsCaption)
-                    .foregroundStyle(Color.gsTextTertiary)
-            } else {
-                ForEach(viewModel.discoveredPeers, id: \.self) { peer in
-                    Button {
-                        viewModel.invite(peer)
-                    } label: {
-                        HStack(spacing: Spacing.sm) {
-                            Image(systemName: "ipad.and.iphone")
-                            Text(peer)
-                                .font(.gsBody)
-                            Spacer()
-                            if case .inviting(let name) = viewModel.flowState, name == peer {
-                                ProgressView().tint(Color.gsTextSecondary)
-                            }
-                        }
-                        .foregroundStyle(Color.gsTextPrimary)
-                        .padding(.horizontal, Spacing.md)
-                        .frame(minHeight: HitTarget.minimum)
-                        .frame(maxWidth: 420)
-                        .background(RoundedRectangle(cornerRadius: Radius.md).fill(Color.gsSurface))
-                    }
-                    .buttonStyle(.plain)
-                }
+    /// 연결된 상대 + 역할 + **연결 끊기**(iPhone 주체). 지금 어떤 기기와 어떻게 연결됐는지 여기서 본다.
+    private var connectedCard: some View {
+        VStack(spacing: Spacing.xs) {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.gsAccent)
+                Text("\(viewModel.connectedPeerName ?? "상대")와 연결됨")
+                    .font(.gsHeadline)
+                    .foregroundStyle(Color.gsTextPrimary)
             }
+
+            Text(roleDescription)
+                .font(.gsCaption)
+                .foregroundStyle(Color.gsTextSecondary)
+                .multilineTextAlignment(.center)
+
+            if viewModel.isInitiator {
+                // 연결 해제는 주체인 iPhone이 한다.
+                Button("연결 끊기") { viewModel.disconnect() }
+                    .font(.gsSubheadline)
+                    .foregroundStyle(Color.gsTextPrimary)
+                    .padding(.horizontal, Spacing.lg)
+                    .frame(minHeight: HitTarget.minimum)
+                    .background(Capsule().fill(Color.gsSurface))
+                    .padding(.top, Spacing.xxs)
+            }
+        }
+        .padding(Spacing.md)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.lg)
+                .fill(Color.gsAccent.opacity(0.12))
+                .overlay(RoundedRectangle(cornerRadius: Radius.lg).stroke(Color.gsAccent.opacity(0.4), lineWidth: 1))
+        )
+    }
+
+    /// "나: 코드(왼손) · 상대: 스트로크(오른손)" 식의 역할 안내.
+    private var roleDescription: String {
+        let mine = viewModel.role.displayName
+        let theirs = viewModel.partnerRole.displayName
+        return "나: \(mine) · 상대: \(theirs)"
+    }
+
+    /// iPad가 연결을 기다릴 때.
+    private var waitingView: some View {
+        VStack(spacing: Spacing.xs) {
+            ProgressView().tint(Color.gsTextSecondary)
+            Text("연결을 기다리는 중…")
+                .font(.gsBody)
+                .foregroundStyle(Color.gsTextSecondary)
+            Text("상대 iPhone에서 이 기기를 선택하면 연결됩니다")
+                .font(.gsCaption)
+                .foregroundStyle(Color.gsTextTertiary)
         }
     }
 
-    private func statusView(icon: String, tint: Color, title: String, detail: String) -> some View {
-        VStack(spacing: Spacing.xs) {
-            Image(systemName: icon)
-                .font(.gsTitle)
-                .foregroundStyle(tint)
-            Text(title)
-                .font(.gsHeading)
-                .foregroundStyle(Color.gsTextPrimary)
-            Text(detail)
-                .font(.gsBody)
-                .foregroundStyle(Color.gsTextSecondary)
-                .multilineTextAlignment(.center)
+    @ViewBuilder
+    private var peerList: some View {
+        if viewModel.discoveredPeers.isEmpty {
+            HStack(spacing: Spacing.xs) {
+                ProgressView().tint(Color.gsTextSecondary)
+                Text("근처 기기를 찾는 중…")
+                    .font(.gsSubheadline)
+                    .foregroundStyle(Color.gsTextSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, Spacing.sm)
+        } else {
+            ForEach(viewModel.discoveredPeers, id: \.self) { peer in
+                Button {
+                    viewModel.invite(peer)
+                } label: {
+                    HStack(spacing: Spacing.sm) {
+                        Image(systemName: "ipad.and.iphone")
+                        Text(peer)
+                            .font(.gsBody)
+                        Spacer()
+                        if peer == viewModel.connectedPeerName {
+                            Image(systemName: "checkmark").foregroundStyle(Color.gsAccent)
+                        } else if case .inviting(let name) = viewModel.flowState, name == peer {
+                            ProgressView().tint(Color.gsTextSecondary)
+                        }
+                    }
+                    .foregroundStyle(Color.gsTextPrimary)
+                    .padding(.horizontal, Spacing.md)
+                    .frame(minHeight: HitTarget.minimum)
+                    .frame(maxWidth: .infinity)
+                    .background(RoundedRectangle(cornerRadius: Radius.md).fill(Color.gsSurface))
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .padding(.horizontal, Spacing.xxl)
     }
 }

@@ -91,6 +91,12 @@ final class NeckViewModel: ObservableObject {
         fingeringState.releaseAll()
     }
 
+    /// 짚을 때 진동을 줄지. **모드 C에서 iPhone은 짚어도 진동 안 하고**, iPad 튕김 신호로만 진동한다.
+    /// 시각(줄 떨림)은 그대로 둔다 — 짚었다는 화면 피드백은 필요하므로.
+    func setHapticsEnabled(_ enabled: Bool) {
+        haptics.isEnabled = enabled
+    }
+
     // MARK: - 구독
 
     /// - Note: 두 퍼블리셔 모두 `@MainActor` 객체가 메인 스레드에서 보내므로 별도 홉이 필요 없다.

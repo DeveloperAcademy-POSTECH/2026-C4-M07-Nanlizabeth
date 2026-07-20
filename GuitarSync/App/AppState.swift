@@ -58,6 +58,9 @@ final class AppState: ObservableObject {
                 receivedFrets = GuitarFingering(frets: frets).frets
             }
             receivedChord = message.chord
+        case .strumHaptic:
+            // 진동 신호 — 이 레거시 상태 저장소에서는 다루지 않는다 (PeerConnectViewModel이 처리).
+            break
         }
     }
 }

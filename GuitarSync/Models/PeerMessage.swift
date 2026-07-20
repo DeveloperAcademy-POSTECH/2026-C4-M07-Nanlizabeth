@@ -7,6 +7,8 @@ struct PeerMessage: Codable, Equatable {
         case syncState
         case fingerNumber
         case fingering
+        /// iPad가 튕겼다 → iPhone이 그 세기로 진동. (모드 C 햅틱, velocity는 `number`에)
+        case strumHaptic
     }
 
     let type: MessageType
@@ -44,6 +46,11 @@ struct PeerMessage: Codable, Equatable {
         PeerMessage(type: .fingering, chord: chord, direction: nil, text: nil, number: nil, frets: frets)
     }
 
+    /// iPad → iPhone 진동 신호. 세기(0~127)를 `number`에 담는다.
+    static func strumHaptic(velocity: UInt8) -> PeerMessage {
+        PeerMessage(type: .strumHaptic, chord: nil, direction: nil, text: nil, number: Int(velocity), frets: nil)
+    }
+
     var logText: String {
         switch type {
         case .selectedChord:
@@ -60,6 +67,8 @@ struct PeerMessage: Codable, Equatable {
             return "fingerNumber \(number.map(String.init) ?? "-")"
         case .fingering:
             return "fingering \(chord?.rawValue ?? "-") \(frets?.map(String.init).joined(separator: ",") ?? "-")"
+        case .strumHaptic:
+            return "strumHaptic \(number.map(String.init) ?? "-")"
         }
     }
 }
