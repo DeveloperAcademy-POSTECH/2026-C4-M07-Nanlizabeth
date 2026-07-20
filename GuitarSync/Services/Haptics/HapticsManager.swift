@@ -29,4 +29,12 @@ enum HapticsManager {
 
         UIImpactFeedbackGenerator(style: style).impactOccurred(intensity: CGFloat(normalized))
     }
+
+    /// 목표와 다른 코드를 짚었을 때의 "아니야" 진동. (SPEC §5.2 판정 햅틱)
+    ///
+    /// 발음 햅틱(`pluck`)과 확실히 구분되도록 **오류 알림 패턴**을 쓴다 — 세게 한 번이 아니라
+    /// 틀렸다는 신호로 읽히는 두 번 진동.
+    static func wrongChord() {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+    }
 }
