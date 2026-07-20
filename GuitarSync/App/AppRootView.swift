@@ -84,6 +84,7 @@ struct AppRootView: View {
             // (사운드홀을 중앙에 크게, 줄이 화면 전체를 관통하는 배치).
             MainInstrumentScreen(
                 viewModel: prototypeViewModel,
+                peer: peerConnect,
                 selectedStrumPattern: strumSelect.selectedPattern,
                 // 처음이면 가이드부터, 봤으면 바로 기기 찾기로. (SPEC 플로우3)
                 onPeerConnect: {

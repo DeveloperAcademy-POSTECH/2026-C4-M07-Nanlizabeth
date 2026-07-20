@@ -14,5 +14,7 @@ protocol MultipeerServiceProtocol: AnyObject {
     func startBrowsing()
     func stopBrowsing()
     func invitePeer(named name: String)
+    /// 세션을 완전히 끊는다. 재연결이 깨끗하게 되도록 상태를 리셋한다.
+    func disconnect()
     func send(_ message: PeerMessage)
 }

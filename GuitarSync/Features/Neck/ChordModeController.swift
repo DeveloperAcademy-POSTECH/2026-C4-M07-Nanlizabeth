@@ -74,4 +74,13 @@ final class ChordModeController: ObservableObject {
     func setTargetChord(_ chord: GuitarChord?) {
         judgment.target = chord
     }
+
+    /// 상대 기기와 **연결되면** 이 iPhone은 소리를 끄고 **진동만** 준다 (모드 C) — 소리는 iPad에서 난다.
+    /// 자동 스트럼도 멈춘다. 연결이 끊기면 다시 소리가 난다(모드 A).
+    func setConnected(_ connected: Bool) {
+        session.fingeringState.isMuted = connected
+        if connected {
+            stop()
+        }
+    }
 }

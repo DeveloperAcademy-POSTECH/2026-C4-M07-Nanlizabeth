@@ -160,7 +160,17 @@ struct PeerBrowseScreen: View {
     @ViewBuilder
     private var peerList: some View {
         VStack(spacing: Spacing.sm) {
-            if viewModel.discoveredPeers.isEmpty {
+            if !viewModel.isInitiator {
+                // iPad(스트로크) = 기다리는 쪽. **연결 주체는 항상 iPhone**이므로 목록이 아니라 대기 안내.
+                ProgressView()
+                    .tint(Color.gsTextSecondary)
+                Text("연결을 기다리는 중…")
+                    .font(.gsBody)
+                    .foregroundStyle(Color.gsTextSecondary)
+                Text("상대 iPhone에서 이 기기를 선택하면 연결됩니다")
+                    .font(.gsCaption)
+                    .foregroundStyle(Color.gsTextTertiary)
+            } else if viewModel.discoveredPeers.isEmpty {
                 ProgressView()
                     .tint(Color.gsTextSecondary)
                 Text("근처 기기를 찾는 중…")

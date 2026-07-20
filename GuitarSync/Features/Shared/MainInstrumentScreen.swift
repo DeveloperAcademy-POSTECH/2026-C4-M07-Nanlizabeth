@@ -2,6 +2,9 @@ import SwiftUI
 
 struct MainInstrumentScreen: View {
     @ObservedObject var viewModel: ScreenshotPrototypeViewModel
+    /// 연결·운지 송수신을 담당하는 단일 세션. (모드 C)
+    @ObservedObject var peer: PeerConnectViewModel
+
     @StateObject private var strumViewModel = GuitarStrumViewModel()
 
     /// 모드 A(넥 + 자동 스트럼). 엔진·운지상태를 하나로 공유해 조립한 컨트롤러.
@@ -13,16 +16,26 @@ struct MainInstrumentScreen: View {
     /// 연결 버튼(🔗)을 눌렀을 때. 기기 찾기 화면으로 이동한다 (AppRootView가 라우팅).
     var onPeerConnect: () -> Void = {}
 
+    /// 이 기기. iPad는 모드 토글을 숨기고 항상 스트로크만 한다.
+    var deviceType: DeviceType = DeviceInfoProvider.currentDeviceType
+
+    private var isPad: Bool { deviceType == .iPad }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             instrument
+
+            if peer.isConnected {
+                connectionBanner
+            }
 
             TopControlBar(
                 mode: viewModel.mode,
                 isPlaying: viewModel.isPlaying,
                 isExpanded: viewModel.isControlBarExpanded,
-                peerButtonState: viewModel.peerButtonState,
+                peerButtonState: peerButtonState,
                 actionTitle: viewModel.actionTitle,
+                showsModeToggle: !isPad,
                 onModeChange: viewModel.toggleMode(_:),
                 onPeer: onPeerConnect,
                 onAction: viewModel.openActionScreen,
@@ -58,38 +71,72 @@ struct MainInstrumentScreen: View {
                 chordMode.stop()
             }
         }
+        // 연결되면 이 iPhone은 무음+진동, 자동 스트럼 정지 (소리는 iPad에서).
+        .onChange(of: peer.isConnected) { _, connected in
+            chordMode.setConnected(connected)
+            if connected { viewModel.isPlaying = false }
+        }
     }
 
-    /// 고른 주법이 있으면 그걸, 없으면 첫 프리셋을 자동 스트럼에 쓴다 —
-    /// 재생을 누르면 무언가는 반드시 들리게.
+    /// 지금 자동 스트럼에 쓸 주법. 고른 게 없으면 첫 프리셋 → 최후 기본값.
     private var patternToPlay: StrumPattern {
         selectedStrumPattern ?? StrumPatternLibrary().presets.first ?? .fallback
+    }
+
+    private var peerButtonState: PrototypePeerButtonState {
+        peer.isConnected ? .connected : .disconnected
+    }
+
+    /// 연결됐을 때 "어떻게 연결됐는지"를 알려주는 배너 — 지금까지 피드백이 없던 부분.
+    private var connectionBanner: some View {
+        HStack(spacing: Spacing.xs) {
+            Image(systemName: "link")
+                .font(.gsCaption)
+            Text(bannerText)
+                .font(.gsCaption)
+        }
+        .foregroundStyle(Color.gsOnAccent)
+        .padding(.horizontal, Spacing.sm)
+        .padding(.vertical, Spacing.xxs)
+        .background(Capsule().fill(Color.gsAccent))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, Spacing.md)
+        .accessibilityLabel(bannerText)
+    }
+
+    private var bannerText: String {
+        let partner = peer.connectedPeerName ?? "상대"
+        // 이 기기의 역할을 사람 말로.
+        let myJob = peer.role == .fingering ? "코드(왼손) — 짚기, 소리는 상대에서" : "스트로크(오른손) — 긁기, 여기서 소리"
+        return "\(partner)와 연결됨 · 나: \(myJob)"
     }
 
     @ViewBuilder
     private var instrument: some View {
         switch viewModel.mode {
         case .chord:
-            // 모드 A — 넥으로 짚으면 개별 발음(SPEC §4), 재생하면 그 코드를 자동 주법으로 긁는다.
-            // 운지가 바뀔 때마다 상대 기기로도 보낸다 (모드 C의 왼손 역할).
+            // 모드 A/C — 넥으로 짚는다. 단독이면 개별 발음(SPEC §4) + 재생 시 자동 스트럼.
+            // 연결되면 무음+진동으로 바뀌고, 운지는 상대(iPad)로 전송돼 거기서 소리가 난다.
             NeckScreen(
                 viewModel: chordMode.neck,
-                onFingeringChanged: viewModel.sendFingering
+                onFingeringChanged: { peer.sendFingering($0) }
             )
                 .ignoresSafeArea()
-                .onAppear { chordMode.start() }
+                .onAppear {
+                    chordMode.start()
+                    chordMode.setConnected(peer.isConnected)
+                }
                 .onDisappear {
                     chordMode.end()
                     viewModel.isPlaying = false
                 }
         case .strum:
+            // 스트럼 — 단독(모드 B)이거나 연결됨(모드 C). 연결되면 상대(iPhone)가 짚은 운지로 소리 난다.
             GuitarStrumView(viewModel: strumViewModel)
                 .ignoresSafeArea()
-                .onAppear {
-                    strumViewModel.updateFingering(viewModel.receivedFrets)
-                }
-                .onChange(of: viewModel.receivedFrets) { _, frets in
-                    strumViewModel.updateFingering(frets)
+                .onAppear { strumViewModel.updateFingering(peer.receivedFingering.frets) }
+                .onChange(of: peer.receivedFingering) { _, fingering in
+                    strumViewModel.updateFingering(fingering.frets)
                 }
         }
     }

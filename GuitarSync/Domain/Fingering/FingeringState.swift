@@ -104,6 +104,10 @@ final class FingeringState: FingeringStateProtocol, ObservableObject {
     /// (실제 기타의 "왼손 해머링" 세기에 해당 — 오른손 스트럼보다 약하게 잡았다)
     var pressVelocity: UInt8
 
+    /// **소리는 끄되 진동·표시 이벤트(`notePlayed`)는 살린다.** (모드 C의 iPhone)
+    /// 연결되면 소리는 iPad에서 나야 하므로, iPhone은 짚어도 소리 없이 진동만 준다.
+    var isMuted = false
+
     var fingeringChanged: AnyPublisher<GuitarFingering, Never> { $currentFingering.eraseToAnyPublisher() }
     var notePlayed: AnyPublisher<NotePlayedEvent, Never> { notePlayedSubject.eraseToAnyPublisher() }
 
@@ -139,7 +143,10 @@ final class FingeringState: FingeringStateProtocol, ObservableObject {
             .compactMapValues { $0.map(\.fret).max() }
 
         for (stringIndex, fret) in soundingFrets.sorted(by: { $0.key < $1.key }) {
-            audioEngine?.pluckString(stringIndex: stringIndex, fretNumber: fret, velocity: pressVelocity)
+            // 무음이면 오디오만 건너뛰고, 진동·화면용 방송은 그대로 낸다.
+            if !isMuted {
+                audioEngine?.pluckString(stringIndex: stringIndex, fretNumber: fret, velocity: pressVelocity)
+            }
             notePlayedSubject.send(
                 NotePlayedEvent(stringIndex: stringIndex, fret: fret, velocity: pressVelocity)
             )
