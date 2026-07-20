@@ -199,7 +199,7 @@ flowchart LR
 
 | ID | 태스크 | 하는 일 | 관련 계약 | 선행 | 크기 |
 |----|--------|--------|----------|------|------|
-| N1 | 원격 소스 구현 | 수신 메시지를 `RemoteFingeringSource`/`RemoteStrumSource`로 포장 + 역할 고정 적용 | §3.7, §3.8 | C6, C7 | M |
+| N1 | 원격 소스 구현 | 수신 메시지를 `RemoteFingeringSource`/`RemoteStrumSource`로 포장 + 역할 고정 적용 | §3.7, §3.8 | C6, C7 | ✅ 완료 (`RemoteFingeringBridge`/`Sender`) |
 
 **🫨 손맛·접근성 레인 (H)** — 음성 명령을 뺀 뒤 **접근성의 주인공**. U3(줄 애니메이션)와 같은 이벤트를 먹으므로 짝으로 개발
 
@@ -216,7 +216,7 @@ flowchart LR
 |----|--------|--------|------|------|
 | I1 | 모드 A 조립 | 넥에서 짚기 × 자동 주법 → 실기기 검증 | L1, L2, L5, U2, U4 | 🟡 로직 조립 완료 (`ChordPracticeSession`) · 화면 버튼 연결·실기기 남음 |
 | I2 | 모드 B 조립 | 자동 진행 × 직접 긁기 → 실기기 검증 | L3, L5, U3, U5, U6 | 🟡 로직 조립 완료 (`StrumPracticeSession`) · 화면 연결·실기기 남음 |
-| I3 | 모드 C 조립 | iPhone 짚기 × iPad 긁기 → 두 기기 검증 | N1, U7, I1, I2 | M |
+| I3 | 모드 C 조립 | iPhone 짚기 × iPad 긁기 → 두 기기 검증 | N1, U7, I1, I2 | 🟡 로직 조립 완료 (`EnsembleStrummerSession`) · 화면 연결·2기기 검증 남음 |
 | I4 | 통합 QA | 전 화면 디자인 점검 + 실기기 발열/성능 + **햅틱·접근성 실사용 검증** + 엣지 케이스(SPEC §8 결정 반영) | I1~I3, H2 | M |
 | I5 | **엔진 최종 결정** ⏳ | A3 데이터(**지연·메모리·발열 종합**)로 Native vs AudioKit 판정 → 진 쪽 파일 정리 (**출시 직전**) | A3, I4 | S |
 
