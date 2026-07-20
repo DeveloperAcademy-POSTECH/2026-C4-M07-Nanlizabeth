@@ -67,44 +67,43 @@ struct MainInstrumentScreen: View {
             }
             #endif
         }
-        // 재생 버튼(▶). 코드 모드면 자동 스트럼을, 스트럼 모드면 자동 코드진행을 켜고 끈다.
+        // 재생 버튼(▶) — 코드 모드의 자동 스트럼만 켜고 끈다.
+        // (스트럼 모드의 자동 코드진행은 재생 버튼과 무관하게 진행이 선택돼 있으면 늘 돈다.)
         .onChange(of: viewModel.isPlaying) { _, playing in
-            switch viewModel.mode {
-            case .chord:
-                if playing {
-                    chordMode.play(pattern: patternToPlay, bpm: viewModel.bpm)
-                } else {
-                    chordMode.stop()
-                }
-            case .strum:
-                updateStrumProgression(playing: playing)
+            guard viewModel.mode == .chord else { return }
+            if playing {
+                chordMode.play(pattern: patternToPlay, bpm: viewModel.bpm)
+            } else {
+                chordMode.stop()
             }
         }
-        // BPM을 바꾸면 재생 중인 자동 진행을 새 속도로 다시 맞춘다.
+        // BPM을 바꾸면 도는 자동 진행을 새 속도로 다시 맞춘다.
         .onChange(of: viewModel.bpm) { _, _ in
-            if viewModel.mode == .strum, viewModel.isPlaying {
-                updateStrumProgression(playing: true)
-            }
+            if viewModel.mode == .strum { refreshStrumProgression() }
         }
         // 연결되면 이 iPhone은 무음+진동, 자동 스트럼 정지 (소리는 iPad에서).
+        // 스트럼 모드면 연결 여부에 따라 자동 진행을 껐다(모드 C) 켰다(모드 B) 한다.
         .onChange(of: peer.isConnected) { _, connected in
             chordMode.setConnected(connected)
-            if connected {
-                viewModel.isPlaying = false
-                strumProgression.stop()
-            }
+            if connected { viewModel.isPlaying = false }
+            if viewModel.mode == .strum { refreshStrumProgression() }
         }
     }
 
-    /// 스트럼 모드(모드 B)의 자동 코드진행을 켜고 끈다.
+    /// 스트럼 모드(모드 B)의 자동 코드진행을 지금 조건에 맞게 켜거나 끈다.
     ///
-    /// **연결됐을 땐(모드 C) 돌리지 않는다** — 그땐 왼손 운지가 iPhone에서 네트워크로 오기 때문.
-    private func updateStrumProgression(playing: Bool) {
-        guard !peer.isConnected else { return }
-        if playing, let progression = selectedProgression {
-            strumProgression.start(progression: progression, bpm: viewModel.bpm, looping: true)
-        } else {
+    /// **재생 버튼과 무관하다** — 스트럼 화면에 있고 진행을 골랐고 연결 안 됐으면 늘 돈다.
+    /// 그래야 "코드진행을 골라놓고 계속 스트로크하면 시간에 맞춰 코드가 자동으로 바뀌는" 연습이 된다.
+    /// 연결됐을 땐(모드 C) 돌리지 않는다 — 그땐 왼손 운지가 iPhone에서 네트워크로 오기 때문.
+    private func refreshStrumProgression() {
+        guard !peer.isConnected, let progression = selectedProgression else {
             strumProgression.stop()
+            return
+        }
+        strumProgression.start(progression: progression, bpm: viewModel.bpm, looping: true)
+        // 첫 코드를 즉시 반영해 둔다 (클럭 첫 틱을 기다리지 않고 바로 그 코드로 소리 나게).
+        if let first = progression.chord(atBar: 0) {
+            strumViewModel.updateFingering(first.fingering.frets)
         }
     }
 
@@ -141,10 +140,22 @@ struct MainInstrumentScreen: View {
             // 그리고 내가 튕길 때마다 그 세기를 상대(iPhone)로 보내 거기서 진동이 나게 한다.
             GuitarStrumView(viewModel: strumViewModel)
                 .ignoresSafeArea()
-                .onAppear { strumViewModel.updateFingering(peer.receivedFingering.frets) }
+                .onAppear {
+                    // 연결됐으면 상대 운지로, 아니면 고른 진행을 자동으로 돌린다.
+                    if peer.isConnected {
+                        strumViewModel.updateFingering(peer.receivedFingering.frets)
+                    } else {
+                        refreshStrumProgression()
+                    }
+                }
                 // 모드 C: 상대(iPhone)가 짚은 운지로 소리 난다.
                 .onChange(of: peer.receivedFingering) { _, fingering in
+                    guard peer.isConnected else { return }
                     strumViewModel.updateFingering(fingering.frets)
+                }
+                // 진행을 새로 고르면 그 진행으로 바로 갈아탄다.
+                .onChange(of: selectedProgression) { _, _ in
+                    refreshStrumProgression()
                 }
                 // 모드 B: 자동 코드진행이 BPM대로 코드를 바꾸면 그 코드로 소리 난다.
                 .onReceive(strumProgression.chordChanged) { chord in
