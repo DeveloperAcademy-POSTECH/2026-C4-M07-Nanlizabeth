@@ -10,6 +10,9 @@ import SwiftUI
 struct AppRootView: View {
     @StateObject private var router = AppRouter()
 
+    /// 연결 화면 2개가 함께 쓴다 — 가이드에서 기기 찾기로 넘어가도 상태가 이어져야 한다.
+    @StateObject private var peerConnect = PeerConnectViewModel()
+
     /// ⚠️ 프로토타입 잔재. 넥·스트럼 화면(U2·U3)이 완성되면 이 뷰모델과
     /// `Features/Shared/` 폴더 전체가 사라진다.
     @StateObject private var prototypeViewModel = ScreenshotPrototypeViewModel()
@@ -91,10 +94,10 @@ struct AppRootView: View {
             ProgressionCustomScreen()
 
         case .peerGuide:
-            PeerGuideScreen()
+            PeerGuideScreen(viewModel: peerConnect)
 
         case .peerBrowse:
-            PeerBrowseScreen()
+            PeerBrowseScreen(viewModel: peerConnect)
         }
     }
 }
