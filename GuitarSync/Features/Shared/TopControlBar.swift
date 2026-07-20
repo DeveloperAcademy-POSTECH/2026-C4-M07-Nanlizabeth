@@ -6,6 +6,8 @@ struct TopControlBar: View {
     let isExpanded: Bool
     let peerButtonState: PrototypePeerButtonState
     let actionTitle: String
+    /// iPad는 항상 스트로크만 하므로 모드 토글을 숨긴다.
+    var showsModeToggle: Bool = true
     let onModeChange: (PrototypeMode) -> Void
     let onPeer: () -> Void
     let onAction: () -> Void
@@ -19,8 +21,10 @@ struct TopControlBar: View {
                 HStack(spacing: 12) {
                     PeerLiquidGlassButton(state: peerButtonState, action: onPeer)
 
-                    SegmentedModeControl(mode: mode, onModeChange: onModeChange)
-                        .frame(width: 310, height: 46)
+                    if showsModeToggle {
+                        SegmentedModeControl(mode: mode, onModeChange: onModeChange)
+                            .frame(width: 310, height: 46)
+                    }
 
                     LiquidGlassTextButton("BPM", action: onToggleBPM)
 

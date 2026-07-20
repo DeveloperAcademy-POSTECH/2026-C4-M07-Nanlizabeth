@@ -60,6 +60,12 @@ final class MultipeerService: NSObject, ObservableObject, MultipeerServiceProtoc
 
     func stopBrowsing() {
         browser?.stopBrowsingForPeers()
+        // ⚠️ 발견 목록을 비워야 재연결이 된다. 안 그러면 다음 탐색에서 이미 아는 기기가
+        // `foundPeer`로 다시 안 올라와(MC는 새 기기만 알림) 목록이 빈 채로 남아 초대할 대상이 없다.
+        // "처음 한 번만 연결되던" 버그의 원인이 이것.
+        discoveredPeerIDs.removeAll()
+        discoveredPeers = []
+        onDiscoveredPeersChanged?(discoveredPeers)
         onConnectionStateChanged?(connectedPeers.isEmpty ? .idle : .connected)
         onLog?("Browsing stopped")
     }
@@ -71,6 +77,19 @@ final class MultipeerService: NSObject, ObservableObject, MultipeerServiceProtoc
         }
         browser?.invitePeer(peerID, to: session, withContext: nil, timeout: 20)
         onLog?("Invite sent to \(name)")
+    }
+
+    func disconnect() {
+        advertiser?.stopAdvertisingPeer()
+        browser?.stopBrowsingForPeers()
+        session.disconnect()
+        discoveredPeerIDs.removeAll()
+        discoveredPeers = []
+        connectedPeers = []
+        onDiscoveredPeersChanged?(discoveredPeers)
+        onConnectedPeersChanged?(connectedPeers)
+        onConnectionStateChanged?(.idle)
+        onLog?("Disconnected")
     }
 
     func send(_ message: PeerMessage) {

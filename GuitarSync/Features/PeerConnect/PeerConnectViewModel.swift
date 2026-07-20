@@ -11,8 +11,19 @@ final class PeerConnectViewModel: ObservableObject {
     /// 가이드에서 지금 보고 있는 단계.
     @Published var guideStep: Int = 0
 
+    /// 연결된 상대가 방금 보내온 운지. **iPad(스트로크 쪽)가 이걸로 소리를 낸다.** (모드 C)
+    @Published private(set) var receivedFingering: GuitarFingering = .open
+    /// 연결된 상대 이름 (피드백 표시용).
+    @Published private(set) var connectedPeerName: String?
+
     /// 이 기기가 맡는 손. 협상 없이 기기 종류로 정해진다.
     let role: PeerHandRole
+
+    /// **연결의 주체는 항상 iPhone(코드 쪽).** iPhone이 찾아 나서고(browse), iPad는 기다린다(advertise).
+    var isInitiator: Bool { role == .fingering }
+
+    /// 마지막으로 보낸 운지 — 같은 값을 반복 전송하지 않으려고 기억한다.
+    private var lastSentFingering: GuitarFingering?
 
     private let service: MultipeerServiceProtocol
     private let guideStore: PeerGuideStoreProtocol
@@ -68,10 +79,16 @@ final class PeerConnectViewModel: ObservableObject {
 
     // MARK: - 탐색·연결
 
+    /// 연결을 시작한다. **역할에 따라 주체가 다르다:**
+    /// - iPhone(코드) = 찾아 나선다 (browse) → 발견한 iPad를 초대
+    /// - iPad(스트로크) = 기다린다 (advertise) → iPhone의 초대를 받는다
     func startBrowsing() {
         flowState = .browsing
-        service.startAdvertising()
-        service.startBrowsing()
+        if isInitiator {
+            service.startBrowsing()
+        } else {
+            service.startAdvertising()
+        }
     }
 
     func invite(_ peerName: String) {
@@ -79,9 +96,16 @@ final class PeerConnectViewModel: ObservableObject {
         service.invitePeer(named: peerName)
     }
 
+    /// 내 운지를 상대에게 보낸다. **모드 C의 iPhone(짚기 담당).** 같은 운지는 다시 안 보낸다.
+    func sendFingering(_ fingering: GuitarFingering) {
+        guard isConnected, fingering != lastSentFingering else { return }
+        lastSentFingering = fingering
+        service.send(.fingering(fingering.frets))
+    }
+
     func stop() {
-        service.stopBrowsing()
-        service.stopAdvertising()
+        // 세션까지 완전히 끊어 재연결이 깨끗하게 되게 한다.
+        service.disconnect()
         flowState = .idle
         discoveredPeers = []
     }
@@ -93,9 +117,15 @@ final class PeerConnectViewModel: ObservableObject {
         service.onConnectedPeersChanged = { [weak self] peers in
             guard let self else { return }
             if let first = peers.first {
+                self.connectedPeerName = first
                 self.flowState = .connected(peerName: first)
-            } else if self.flowState.isConnected {
-                self.flowState = .disconnected(reason: nil)
+            } else {
+                self.connectedPeerName = nil
+                self.lastSentFingering = nil
+                self.receivedFingering = .open
+                if self.flowState.isConnected {
+                    self.flowState = .disconnected(reason: nil)
+                }
             }
         }
         service.onConnectionStateChanged = { [weak self] state in
@@ -103,6 +133,11 @@ final class PeerConnectViewModel: ObservableObject {
             if case .failed(let message) = state {
                 self.flowState = .failed(message: message)
             }
+        }
+        // 상대가 보낸 운지 → iPad가 소리 낼 재료. (모드 C의 왼손이 네트워크로 들어온다)
+        service.onMessageReceived = { [weak self] message, _ in
+            guard message.type == .fingering, let frets = message.frets else { return }
+            self?.receivedFingering = GuitarFingering(frets: frets)
         }
     }
 }
@@ -173,6 +208,14 @@ final class MockMultipeerService: MultipeerServiceProtocol {
     func stopBrowsing() {
         discoveredPeers = []
         onDiscoveredPeersChanged?(discoveredPeers)
+    }
+
+    func disconnect() {
+        connectedPeers = []
+        discoveredPeers = []
+        onConnectedPeersChanged?(connectedPeers)
+        onDiscoveredPeersChanged?(discoveredPeers)
+        onConnectionStateChanged?(.idle)
     }
 
     func invitePeer(named name: String) {
