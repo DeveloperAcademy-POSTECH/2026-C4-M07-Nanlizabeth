@@ -15,6 +15,9 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
     private var samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
     private lazy var mixer = Mixer(samplers.map { $0 as Node })
 
+    /// 샘플러 6개가 전부 사운드폰트를 물고 있는가. (네이티브 엔진과 같은 이유 — `NativeAudioEngine` 참고)
+    private var isSoundFontLoaded = false
+
     override init() {
         super.init()
         setupEngine()
@@ -31,6 +34,10 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
     }
 
     override func performStart() {
+        if !isSoundFontLoaded {
+            loadSoundFont()
+        }
+
         do {
             try engine.start()
         } catch {
@@ -38,8 +45,10 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
         }
     }
 
+    /// ⚠️ **`stop()`이 아니라 `pause()`인 이유는 네이티브 엔진과 같다** —
+    /// 완전히 멈추면 샘플러가 사운드폰트를 잃어 다시 켰을 때 **사인파**가 난다.
     override func performStop() {
-        engine.stop()
+        engine.pause()
     }
 
     override var isEngineRunning: Bool { engine.avEngine.isRunning }
@@ -55,6 +64,8 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
         samplers = (0..<GuitarFingering.stringCount).map { _ in AppleSampler() }
         mixer = Mixer(samplers.map { $0 as Node })
 
+        // 샘플러가 새것이라 음색은 아직 안 들어 있다.
+        isSoundFontLoaded = false
         isSetUp = false
         setupEngine()
         performStart()
@@ -80,6 +91,8 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
             return
         }
 
+        var loadedCount = 0
+
         for sampler in samplers {
             do {
                 try sampler.samplerUnit.loadSoundBankInstrument(
@@ -89,10 +102,13 @@ final class AudioKitAudioEngine: GuitarAudioEngineBase, GuitarAudioEngineProtoco
                     bankLSB: 0
                 )
                 configureSamplerExpression(sampler)
+                loadedCount += 1
             } catch {
                 logAudioError("Failed to load AcousticGuitar.sf2: \(error.localizedDescription)")
             }
         }
+
+        isSoundFontLoaded = loadedCount == samplers.count
     }
 
     private func configureSamplerExpression(_ sampler: AppleSampler) {
