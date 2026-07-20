@@ -49,12 +49,21 @@ final class NeckViewModel: ObservableObject {
         self.init(fingeringState: MockFingeringState(stubChord: stubChord), audioEngine: nil)
     }
 
-    init(fingeringState: FingeringStateProtocol, audioEngine: GuitarAudioEngineProtocol?) {
+    /// - Parameter feedbackPublisher: 줄 떨림·햅틱을 일으킬 이벤트 스트림.
+    ///   비우면 자기 `fingeringState.notePlayed`(짚기)만 먹는다. **모드 A로 조립될 때는**
+    ///   세션의 합쳐진 스트림(짚기 + 자동 스트럼)을 넣어, 자동으로 긁힌 줄도 떨리고 진동한다.
+    init(
+        fingeringState: FingeringStateProtocol,
+        audioEngine: GuitarAudioEngineProtocol?,
+        feedbackPublisher: AnyPublisher<NotePlayedEvent, Never>? = nil
+    ) {
         self.fingeringState = fingeringState
         self.audioEngine = audioEngine
         self.fingering = fingeringState.currentFingering
-        subscribe()
-        haptics.connect(to: fingeringState.notePlayed)   // H1 — 짚으면 세기별 진동
+
+        let feedback = feedbackPublisher ?? fingeringState.notePlayed
+        subscribe(feedback: feedback)
+        haptics.connect(to: feedback)   // H1 — 세기별 진동
     }
 
     // MARK: - 화면 수명주기
@@ -85,14 +94,14 @@ final class NeckViewModel: ObservableObject {
     // MARK: - 구독
 
     /// - Note: 두 퍼블리셔 모두 `@MainActor` 객체가 메인 스레드에서 보내므로 별도 홉이 필요 없다.
-    private func subscribe() {
+    private func subscribe(feedback: AnyPublisher<NotePlayedEvent, Never>) {
         fingeringState.fingeringChanged
             .sink { [weak self] fingering in
                 self?.fingering = fingering
             }
             .store(in: &cancellables)
 
-        fingeringState.notePlayed
+        feedback
             .sink { [weak self] event in
                 self?.flash(stringIndex: event.stringIndex, velocity: event.velocity)
             }

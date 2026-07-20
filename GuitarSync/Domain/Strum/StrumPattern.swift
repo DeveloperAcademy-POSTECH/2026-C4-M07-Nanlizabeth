@@ -122,6 +122,14 @@ struct StrumPattern: Equatable, Codable, Identifiable {
     func steps(at position: BeatPosition) -> [StrumStep] {
         steps.filter { $0.position == position }
     }
+
+    /// 프리셋 목록이 비었을 때를 위한 최후 기본값 — 매 박 다운 스트로크.
+    /// (`Content/StrumPresetData`가 채워져 있으면 쓸 일이 없다.)
+    static let fallback = StrumPattern(
+        name: "4비트 기본",
+        steps: (0..<4).map { StrumStep(beat: $0, .down, $0 == 0 ? .strong : .medium) },
+        recommendedBPM: 80
+    )
 }
 
 // MARK: - 라이브러리 계약
