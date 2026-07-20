@@ -42,6 +42,26 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
     var isPerformanceScreen: Bool {
         self == .neck || self == .strum
     }
+
+    /// 이 화면이 해당 기기에 존재하는가.
+    ///
+    /// **iPad는 iPhone의 확장**이라 필요한 화면이 더 적다 (SPEC §플로우3):
+    /// - ❌ `neck` — iPad는 왼손(코드 짚기)을 절대 맡지 않는다
+    /// - ❌ `strokeSelect` — iPad는 **항상 직접** 긁으므로 자동 주법을 고를 일이 없다
+    ///
+    /// 나머지(스트럼·진행 선택/커스텀·연결·온보딩)는 iPad 단독 스트로크 연습과 합주에 모두 필요하다.
+    func isAvailable(on deviceType: DeviceType) -> Bool {
+        guard deviceType == .iPad else { return true }
+        switch self {
+        case .neck, .strokeSelect: return false
+        default: return true
+        }
+    }
+
+    /// 해당 기기에서 쓸 수 있는 화면 목록.
+    static func routes(for deviceType: DeviceType) -> [AppRoute] {
+        allCases.filter { $0.isAvailable(on: deviceType) }
+    }
 }
 
 /// **모든 화면 전환은 이 안내데스크를 거친다.** (ARCHITECTURE §3.9)
@@ -61,6 +81,9 @@ final class AppRouter: ObservableObject {
     /// 뒤로 가기용 방문 기록 (현재 화면은 포함하지 않는다).
     @Published private(set) var history: [AppRoute] = []
 
+    /// 이 기기가 무엇인가. 화면 접근 가능 여부를 가르는 기준.
+    let deviceType: DeviceType
+
     private let onboardingStore: OnboardingStoreProtocol
 
     /// - Parameter onboardingStore: 생략하면 `UserDefaults` 기반 실제 저장소.
@@ -71,6 +94,7 @@ final class AppRouter: ObservableObject {
     ) {
         // 기본값을 인자 자리에 두면 nonisolated 컨텍스트에서 평가돼 @MainActor와 충돌한다.
         let store = onboardingStore ?? OnboardingStore()
+        self.deviceType = deviceType
         self.onboardingStore = store
         self.currentRoute = Self.startRoute(deviceType: deviceType, onboardingStore: store)
     }
@@ -112,6 +136,12 @@ final class AppRouter: ObservableObject {
 
     func navigate(to route: AppRoute) {
         guard route != currentRoute else { return }
+        // 이 기기에 없는 화면으로는 가지 않는다 (예: iPad에서 기타넥).
+        // 조용히 무시하지 않고 디버그에서 시끄럽게 알린다 — 대개 화면 연결 실수다.
+        guard route.isAvailable(on: deviceType) else {
+            assertionFailure("\(deviceType.displayName)에는 \(route) 화면이 없습니다. AppRoute.isAvailable(on:) 참고.")
+            return
+        }
         history.append(currentRoute)
         currentRoute = route
     }

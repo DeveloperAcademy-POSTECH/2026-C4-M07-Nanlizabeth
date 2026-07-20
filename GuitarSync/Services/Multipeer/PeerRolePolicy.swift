@@ -21,10 +21,23 @@ enum PeerHandRole: String, Equatable {
     var producesSound: Bool { self == .strumming }
 
     /// 이 역할에 대응하는 연주 모드.
-    var playMode: PlayMode {
-        switch self {
-        case .fingering: return .ensembleFingerer
-        case .strumming: return .ensembleStrummer
+    ///
+    /// **연결 여부에 따라 달라진다** — 이걸 구분하지 않으면 혼자 쓰는 사용자가
+    /// 원격 소스를 기다리며 아무 소리도 못 내게 된다.
+    ///
+    /// | 역할 | 단독 | 연결됨 |
+    /// |------|------|--------|
+    /// | 왼손(iPhone) | 모드 A 코드 연습 | 모드 C 짚기 담당 (전송만) |
+    /// | 오른손(iPad) | 모드 B 스트로크 연습 | 모드 C 긁기 담당 (소리 남) |
+    ///
+    /// iPad 단독이 모드 B가 되는 근거: 오른손은 직접 긁고, 왼손은 코드진행이 자동으로 짚어준다.
+    /// 그래서 iPad에도 **코드진행 선택 화면이 필요**하다 (스트럼 화면의 ⓒ 버튼).
+    func playMode(isConnected: Bool) -> PlayMode {
+        switch (self, isConnected) {
+        case (.fingering, false): return .chordPractice
+        case (.fingering, true): return .ensembleFingerer
+        case (.strumming, false): return .strumPractice
+        case (.strumming, true): return .ensembleStrummer
         }
     }
 }

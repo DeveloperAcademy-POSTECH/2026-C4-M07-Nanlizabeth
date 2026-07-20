@@ -31,8 +31,11 @@ extension EnvironmentValues {
 ///   ARCHITECTURE §2.5의 예외 처리 항목을 따를 것.
 struct PortraitLockedLandscapeStage<Content: View>: View {
     let content: Content
+    /// 어느 기준 도화지를 쓸 것인가. 기본은 현재 기기(iPhone 874×402 / iPad 1366×1024).
+    var reference: CGSize = LayoutTokens.referenceStage
 
-    init(@ViewBuilder content: () -> Content) {
+    init(reference: CGSize = LayoutTokens.referenceStage, @ViewBuilder content: () -> Content) {
+        self.reference = reference
         self.content = content()
     }
 
@@ -40,7 +43,7 @@ struct PortraitLockedLandscapeStage<Content: View>: View {
         GeometryReader { proxy in
             // 회전 후 기준이므로 가로/세로가 뒤바뀐다.
             let stageSize = CGSize(width: proxy.size.height, height: proxy.size.width)
-            let scale = LayoutTokens.scale(for: stageSize)
+            let scale = LayoutTokens.scale(reference: reference, in: stageSize)
 
             // 세이프에어리어도 회전에 맞춰 한 칸씩 돌리고,
             // 콘텐츠가 기준 좌표계에 있으므로 배율로 나눠 같은 물리 거리를 가리키게 한다.
@@ -53,8 +56,8 @@ struct PortraitLockedLandscapeStage<Content: View>: View {
 
             content
                 .environment(\.landscapeStageSafeAreaInsets, stageSafeArea)
-                .environment(\.stageScale, scale)
-                .frame(width: LayoutTokens.referenceStage.width, height: LayoutTokens.referenceStage.height)
+                .environment(\.stageMetrics, StageMetrics(reference: reference, scale: scale))
+                .frame(width: reference.width, height: reference.height)
                 .scaleEffect(scale)
                 .frame(width: stageSize.width, height: stageSize.height)
                 .rotationEffect(.degrees(-90))

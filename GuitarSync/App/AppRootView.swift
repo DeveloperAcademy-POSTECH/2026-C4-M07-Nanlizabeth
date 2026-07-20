@@ -25,9 +25,10 @@ struct AppRootView: View {
         }
         .environmentObject(router)
         .preferredColorScheme(.dark)
-        // ⚠️ 프로토타입 다리 — 아래 두 개는 U2·U3와 함께 사라진다.
-        // 프로토타입 화면은 자체 `screen` 값으로 이동하므로, 그걸 라우터 이동으로 옮겨준다.
+        // ⚠️ 프로토타입 다리 — 아래 세 개는 U2·U3와 함께 사라진다.
+        // 프로토타입 화면은 자체 `screen`·`mode` 값으로 도는데, 라우터가 정답이어야 하므로 이어 붙인다.
         // (규약: 화면 전환은 반드시 라우터로 — ARCHITECTURE §5)
+        .onAppear { syncPrototype(to: router.currentRoute) }
         .onChange(of: prototypeViewModel.screen) { _, screen in
             switch screen {
             case .main: break
@@ -35,11 +36,25 @@ struct AppRootView: View {
             case .chordProgression: router.navigate(to: .progressionSelect)
             }
         }
-        // 라우터로 메인에 돌아오면 프로토타입 쪽 상태도 되돌려, 다음 이동이 다시 감지되게 한다.
         .onChange(of: router.currentRoute) { _, route in
-            if route == .neck || route == .strum {
-                prototypeViewModel.screen = .main
-            }
+            syncPrototype(to: route)
+        }
+    }
+
+    /// 라우터 → 프로토타입 상태. **라우터가 정답이다.**
+    ///
+    /// 이걸 안 하면 iPad에서 라우터는 `.strum`인데 프로토타입은 기본값 `.chord`라
+    /// **iPad에 기타넥이 뜬다** (iPad는 왼손을 안 맡는데도).
+    private func syncPrototype(to route: AppRoute) {
+        switch route {
+        case .neck:
+            prototypeViewModel.mode = .chord
+            prototypeViewModel.screen = .main
+        case .strum:
+            prototypeViewModel.mode = .strum
+            prototypeViewModel.screen = .main
+        default:
+            break
         }
     }
 
@@ -52,6 +67,11 @@ struct AppRootView: View {
         case .neck, .strum:
             // ⚠️ 임시 — 넥과 스트럼이 아직 프로토타입 한 화면에 같이 들어 있다.
             // U2(넥)·U3(스트럼)에서 각각 독립 화면으로 분리하며 이 case를 나눈다.
+            //
+            // ⚠️ **iPad에서는 레이아웃이 맞지 않는다.** 이 화면은 iPhone 874×402 기준으로
+            // 짜여 있는데 iPad 도화지는 1366×1024라 여백이 크게 남는다.
+            // iPad용 스트럼 레이아웃은 U3에서 Figma `iPad Pro 12.9" - 3/4/5`를 보고 새로 짠다
+            // (사운드홀을 중앙에 크게, 줄이 화면 전체를 관통하는 배치).
             MainInstrumentScreen(viewModel: prototypeViewModel)
 
         case .strokeSelect:
