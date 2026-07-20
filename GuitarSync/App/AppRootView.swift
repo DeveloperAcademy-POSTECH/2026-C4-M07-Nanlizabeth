@@ -13,6 +13,10 @@ struct AppRootView: View {
     /// 연결 화면 2개가 함께 쓴다 — 가이드에서 기기 찾기로 넘어가도 상태가 이어져야 한다.
     @StateObject private var peerConnect = PeerConnectViewModel()
 
+    /// 고른 주법은 **화면보다 오래 살아야 한다** — 목록에 들어갔다 나와도 선택이 유지되도록
+    /// 여기에 둔다. 실제 연주에 물리는 건 L5(코디네이터)에서.
+    @StateObject private var strumSelect = StrumSelectViewModel()
+
     /// ⚠️ 프로토타입 잔재. 넥·스트럼 화면(U2·U3)이 완성되면 이 뷰모델과
     /// `Features/Shared/` 폴더 전체가 사라진다.
     @StateObject private var prototypeViewModel = ScreenshotPrototypeViewModel()
@@ -79,6 +83,7 @@ struct AppRootView: View {
 
         case .strokeSelect:
             StrumSelectScreen(
+                viewModel: strumSelect,
                 onBack: router.back,
                 onConfirm: router.back
             )
