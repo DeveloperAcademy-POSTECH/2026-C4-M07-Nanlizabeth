@@ -3,18 +3,12 @@ import SwiftUI
 struct MainInstrumentScreen: View {
     @ObservedObject var viewModel: ScreenshotPrototypeViewModel
     @StateObject private var strumViewModel = GuitarStrumViewModel()
-    @StateObject private var neckViewModel = NeckViewModel()
 
-    // ⚠️ **알려진 비용: 이 셸에서는 오디오 엔진이 두 벌 만들어진다.**
-    //
-    // 넥과 스트럼이 각자 뷰모델을 들고 있고 뷰모델마다 엔진을 만들기 때문이다.
-    // 화면은 한 번에 하나만 보이므로 소리가 겹치지는 않지만, 샘플러 12개 + 사운드폰트 2회 로드라
-    // **메모리를 두 배로 쓴다.** A3(엔진 A/B 실측)가 이 상태에서 잰 메모리 값을 그대로 믿으면 안 된다.
-    //
-    // 제대로 된 자리는 세션 코디네이터(ARCHITECTURE §3.7)다 — 왼손·오른손 소스를 조립하는 쪽이
-    // 엔진 하나를 소유하고 양쪽에 나눠주는 구조. **태스크 L5에서 정리된다.**
-    // 여기서 미리 고치지 않는 이유: 이 셸 자체가 U2·U3 완성과 함께 사라질 코드라
-    // 지금 손대면 버릴 코드에 설계를 얹는 셈이 된다.
+    /// 모드 A(넥 + 자동 스트럼). 엔진·운지상태를 하나로 공유해 조립한 컨트롤러.
+    @StateObject private var chordMode = ChordModeController()
+
+    /// 스트로크 선택(U4)에서 고른 주법. 재생 시 자동 스트럼이 이걸 긁는다.
+    var selectedStrumPattern: StrumPattern?
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -52,21 +46,39 @@ struct MainInstrumentScreen: View {
             }
             #endif
         }
+        // 재생 버튼(▶)이 isPlaying을 토글한다. 코드 모드면 자동 스트럼을 켜고 끈다.
+        .onChange(of: viewModel.isPlaying) { _, playing in
+            guard viewModel.mode == .chord else { return }
+            if playing {
+                chordMode.play(pattern: patternToPlay, bpm: viewModel.bpm)
+            } else {
+                chordMode.stop()
+            }
+        }
+    }
+
+    /// 고른 주법이 있으면 그걸, 없으면 첫 프리셋을 자동 스트럼에 쓴다 —
+    /// 재생을 누르면 무언가는 반드시 들리게.
+    private var patternToPlay: StrumPattern {
+        selectedStrumPattern ?? StrumPatternLibrary().presets.first ?? .fallback
     }
 
     @ViewBuilder
     private var instrument: some View {
         switch viewModel.mode {
         case .chord:
-            // U2 — 진짜 기타넥. 멀티터치로 짚으면 그 자리에서 소리가 난다 (SPEC §4).
+            // 모드 A — 넥으로 짚으면 개별 발음(SPEC §4), 재생하면 그 코드를 자동 주법으로 긁는다.
             // 운지가 바뀔 때마다 상대 기기로도 보낸다 (모드 C의 왼손 역할).
             NeckScreen(
-                viewModel: neckViewModel,
+                viewModel: chordMode.neck,
                 onFingeringChanged: viewModel.sendFingering
             )
                 .ignoresSafeArea()
-                .onAppear { neckViewModel.startAudio() }
-                .onDisappear { neckViewModel.stopAudio() }
+                .onAppear { chordMode.start() }
+                .onDisappear {
+                    chordMode.end()
+                    viewModel.isPlaying = false
+                }
         case .strum:
             GuitarStrumView(viewModel: strumViewModel)
                 .ignoresSafeArea()

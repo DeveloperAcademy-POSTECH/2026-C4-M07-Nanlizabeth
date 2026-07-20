@@ -82,7 +82,10 @@ struct AppRootView: View {
             // 짜여 있는데 iPad 도화지는 1366×1024라 여백이 크게 남는다.
             // iPad용 스트럼 레이아웃은 U3에서 Figma `iPad Pro 12.9" - 3/4/5`를 보고 새로 짠다
             // (사운드홀을 중앙에 크게, 줄이 화면 전체를 관통하는 배치).
-            MainInstrumentScreen(viewModel: prototypeViewModel)
+            MainInstrumentScreen(
+                viewModel: prototypeViewModel,
+                selectedStrumPattern: strumSelect.selectedPattern
+            )
 
         case .strokeSelect:
             StrumSelectScreen(
