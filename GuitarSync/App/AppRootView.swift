@@ -24,8 +24,15 @@ struct AppRootView: View {
     /// `Features/Shared/` 폴더 전체가 사라진다.
     @StateObject private var prototypeViewModel = ScreenshotPrototypeViewModel()
 
+    /// iPad **스트럼**만 Figma iPad 4:3 도화지(1366×1024)를 쓴다 — 배경 이미지가 화면을 꽉 채우도록.
+    /// 나머지 화면·기기는 기존 iPhone 도화지(874×402) 그대로. (iPad 다른 화면들의 4:3 재배치는 이후 작업)
+    private var stageReference: CGSize {
+        let isPad = DeviceInfoProvider.currentDeviceType == .iPad
+        return isPad && router.currentRoute == .strum ? LayoutTokens.padStage : LayoutTokens.phoneStage
+    }
+
     var body: some View {
-        PortraitLockedLandscapeStage {
+        PortraitLockedLandscapeStage(reference: stageReference) {
             ZStack {
                 Color.gsStageBackground
                     .ignoresSafeArea()

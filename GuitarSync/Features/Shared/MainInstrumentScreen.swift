@@ -150,7 +150,7 @@ struct MainInstrumentScreen: View {
         case .strum:
             // 스트럼 — 단독(모드 B)이거나 연결됨(모드 C). 연결되면 상대(iPhone)가 짚은 운지로 소리 난다.
             // 그리고 내가 튕길 때마다 그 세기를 상대(iPhone)로 보내 거기서 진동이 나게 한다.
-            GuitarStrumView(viewModel: strumViewModel)
+            GuitarStrumView(viewModel: strumViewModel, isPad: isPad)
                 .ignoresSafeArea()
                 .onAppear {
                     // 연결됐으면 상대 운지로, 아니면 고른 진행을 자동으로 돌린다.
