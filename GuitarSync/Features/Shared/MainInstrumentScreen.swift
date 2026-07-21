@@ -41,18 +41,21 @@ struct MainInstrumentScreen: View {
                 peerButtonState: peerButtonState,
                 actionTitle: viewModel.actionTitle,
                 showsModeToggle: !isPad,
+                // BPM은 **일시정지 중에만** 바꾼다 — 재생 중엔 잠근다.
+                bpmEnabled: !viewModel.isPlaying,
                 onModeChange: onModeChange,
                 onPeer: onPeerConnect,
                 onAction: viewModel.openActionScreen,
                 onTogglePlayback: viewModel.togglePlayback,
-                onToggleBPM: viewModel.toggleBPM,
+                onToggleBPM: { if !viewModel.isPlaying { viewModel.toggleBPM() } },
                 onToggleControls: viewModel.toggleControls
             )
             .padding(.top, 20)
             .padding(.leading, 20)
             .padding(.trailing, 60)
 
-            if viewModel.showBPM && viewModel.isControlBarExpanded {
+            // 재생 중엔 BPM 팝오버를 감춘다 (일시정지 상태에서만 조절 가능).
+            if viewModel.showBPM && viewModel.isControlBarExpanded && !viewModel.isPlaying {
                 BPMPopover(bpm: $viewModel.bpm)
                     .padding(.top, 88)
                     .padding(.trailing, 162)
@@ -67,43 +70,39 @@ struct MainInstrumentScreen: View {
             }
             #endif
         }
-        // BPM을 바꾸면 도는 자동 연주(코드 모드=주법 / 스트럼 모드=진행)를 새 속도로 다시 맞춘다.
-        .onChange(of: viewModel.bpm) { _, _ in
-            switch viewModel.mode {
-            case .chord: refreshChordStrum()
-            case .strum: refreshStrumProgression()
-            }
+        // 재생 버튼(▶/⏸)으로 자동 연주를 시작·정지한다.
+        .onChange(of: viewModel.isPlaying) { _, playing in
+            if playing { viewModel.showBPM = false }   // 재생 시작하면 BPM 팝오버 닫기
+            refreshAuto()
         }
         // 연결 여부에 따라 자동 연주를 껐다(모드 C) 켰다(모드 A·B) 한다.
         .onChange(of: peer.isConnected) { _, connected in
             chordMode.setConnected(connected)
-            switch viewModel.mode {
-            case .chord: refreshChordStrum()
-            case .strum: refreshStrumProgression()
-            }
+            refreshAuto()
         }
     }
 
-    /// 코드 모드(모드 A)의 자동 주법을 지금 조건에 맞게 켜거나 끈다.
-    ///
-    /// **재생 버튼과 무관하다** — 코드 화면에 있고 연결 안 됐으면 늘 돈다. 그래야 "코드를 짚어놓고
-    /// 있으면 고른 주법이 BPM대로 자동으로 긁으며 그 코드로 소리 나는" 연습이 된다 (짚기 자체는 무음).
-    /// 연결됐을 땐(모드 C) 돌리지 않는다 — 소리는 iPad에서 나기 때문.
+    /// 지금 모드의 자동 연주를 조건에 맞게 켜거나 끈다.
+    private func refreshAuto() {
+        switch viewModel.mode {
+        case .chord: refreshChordStrum()
+        case .strum: refreshStrumProgression()
+        }
+    }
+
+    /// 코드 모드(모드 A)의 자동 주법. **재생 중이고 연결 안 됐을 때만** 돈다.
+    /// (짚기 자체는 무음이고, 이 자동 주법이 짚은 코드로 소리 낸다.)
     private func refreshChordStrum() {
-        guard !peer.isConnected else {
+        guard !peer.isConnected, viewModel.isPlaying else {
             chordMode.stop()
             return
         }
         chordMode.play(pattern: patternToPlay, bpm: viewModel.bpm)
     }
 
-    /// 스트럼 모드(모드 B)의 자동 코드진행을 지금 조건에 맞게 켜거나 끈다.
-    ///
-    /// **재생 버튼과 무관하다** — 스트럼 화면에 있고 진행을 골랐고 연결 안 됐으면 늘 돈다.
-    /// 그래야 "코드진행을 골라놓고 계속 스트로크하면 시간에 맞춰 코드가 자동으로 바뀌는" 연습이 된다.
-    /// 연결됐을 땐(모드 C) 돌리지 않는다 — 그땐 왼손 운지가 iPhone에서 네트워크로 오기 때문.
+    /// 스트럼 모드(모드 B)의 자동 코드진행. **재생 중이고 진행을 골랐고 연결 안 됐을 때만** 돈다.
     private func refreshStrumProgression() {
-        guard !peer.isConnected, let progression = selectedProgression else {
+        guard !peer.isConnected, viewModel.isPlaying, let progression = selectedProgression else {
             strumProgression.stop()
             return
         }

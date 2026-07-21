@@ -8,6 +8,8 @@ struct TopControlBar: View {
     let actionTitle: String
     /// iPad는 항상 스트로크만 하므로 모드 토글을 숨긴다.
     var showsModeToggle: Bool = true
+    /// BPM은 일시정지 중에만 바꿀 수 있다 — 재생 중이면 버튼을 흐리게·비활성화한다.
+    var bpmEnabled: Bool = true
     let onModeChange: (PrototypeMode) -> Void
     let onPeer: () -> Void
     let onAction: () -> Void
@@ -27,6 +29,8 @@ struct TopControlBar: View {
                     }
 
                     LiquidGlassTextButton("BPM", action: onToggleBPM)
+                        .disabled(!bpmEnabled)
+                        .opacity(bpmEnabled ? 1 : 0.4)
 
                     LiquidGlassIconButton(
                         systemName: isPlaying ? "pause.fill" : "play.fill",
