@@ -102,14 +102,14 @@ final class GuitarStrumViewModel: ObservableObject {
     ///
     /// 손가락마다 따로 처리하므로 아르페지오(여러 줄을 각자 튕기기)와 화음(동시에 긁기)이
     /// 둘 다 된다.
-    func handleTouchesChanged(_ touches: [TouchID: CGPoint], in size: CGSize) {
+    func handleTouchesChanged(_ touches: [TouchID: CGPoint], band: CGRect) {
         // 뗀 손가락의 흔적부터 지운다.
         tracks = tracks.filter { touches.keys.contains($0.key) }
 
         let now = ProcessInfo.processInfo.systemUptime
 
         for (id, location) in touches {
-            handleTouch(id: id, location: location, in: size, at: now)
+            handleTouch(id: id, location: location, band: band, at: now)
         }
 
         debugState.activeTouchCount = touches.count
@@ -121,11 +121,11 @@ final class GuitarStrumViewModel: ObservableObject {
         debugState.activeTouchCount = 0
     }
 
-    private func handleTouch(id: TouchID, location: CGPoint, in size: CGSize, at time: TimeInterval) {
+    private func handleTouch(id: TouchID, location: CGPoint, band: CGRect, at time: TimeInterval) {
         let currentAxisValue = axisValue(from: location, axis: layoutConfiguration.strumAxis)
         let currentStringIndex = stringIndex(
             from: location,
-            in: size,
+            in: band,
             configuration: layoutConfiguration
         )
 
