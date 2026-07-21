@@ -132,9 +132,11 @@ GuitarSync/
 
 ---
 
-## 2.5 레이아웃 규약 ✅ 확정 (2026-07-20, 태스크 F1)
+## 2.5 레이아웃 규약 ✅ 확정 (2026-07-20, 태스크 F1 · 2026-07-21 iPad 보강)
 
-**한 줄:** 앱은 세로 고정이고, 스테이지가 콘텐츠를 회전시켜 가로를 만든다. 화면은 전부 **852×393 도화지 하나**에만 그린다.
+> 🧭 **이 결정의 근거·대안·예외는 [ADR 0005](adr/0005-portrait-locked-landscape-stage.md).**
+
+**한 줄:** iPhone은 세로 고정이라 스테이지가 콘텐츠를 회전시켜 가로를 만들고, **iPad는 가로 네이티브라 회전하지 않는다.** 화면은 전부 **874×402 도화지 하나**에만 그린다.
 
 | 항목 | 결정 |
 |------|------|
@@ -182,6 +184,8 @@ GuitarSync/
 (메서드 이름은 확정 제안입니다. 계약 담당자가 구현하며 다듬되, **바꾸면 반드시 팀 공지 + 이 문서 수정**.)
 
 ### 3.1 `GuitarAudioEngineProtocol` (✅ 있음) — Domain/Audio
+
+> 🧭 **왜 두 엔진을 계약 뒤에 두나 → [ADR 0003](adr/0003-dual-audio-engine-behind-contract.md) · 동작 원리 → [tech-notes/audio-pipeline](tech-notes/audio-pipeline.md).**
 
 **책임:** "소리 내라/멈춰라" 명령의 공통 껍데기. Native와 AudioKit 둘 다 이걸 구현.
 
@@ -325,6 +329,8 @@ GuitarSync/
 - 🗣️ *쉬운 설명: 노래방 반주기의 왼손 버전. 정해둔 순서대로 때가 되면 코드를 갈아 짚어준다.*
 
 ### 3.7 소스와 코디네이터 [새로] — Domain/Session ★이 앱의 심장
+
+> 🧭 **이 결정의 근거·대안은 [ADR 0004](adr/0004-sources-and-coordinator.md).**
 
 **책임:** SPEC §2의 "왼손 × 오른손 = 3가지 방식" 표를 코드 구조로 옮긴 것. **모드 = 플러그 조합.**
 
@@ -470,3 +476,23 @@ GuitarSync/
 | 화면 전환 | 반드시 `AppRouter` 경유 |
 | 색·여백 | 반드시 `DesignSystem/Tokens/` — 숫자 직접 쓰기 금지 |
 | 계약 변경 | 계약 파일을 바꾸면 **팀 공지 + 이 문서 갱신** 필수 |
+
+---
+
+## 관련 문서
+
+이 문서는 "**어떻게**"다. "무엇을"·"무슨 순서로"·"왜 이 결정을"은 아래에서.
+
+- 제품 명세(모드·플로우·화면·온보딩·열린 결정) → [SPEC.md](SPEC.md)
+- 순서·태스크 보드 → [ROADMAP.md](ROADMAP.md) · 회고 학습 분담 → [LEARNING-AREAS.md](LEARNING-AREAS.md)
+
+**결정 기록 (ADR) — "왜 이렇게 정했나":**
+- [0001](adr/0001-multipeer-connectivity.md) 통신에 MultipeerConnectivity
+- [0002](adr/0002-audio-engine.md) 오디오 엔진 AVAudioEngine · [0003](adr/0003-dual-audio-engine-behind-contract.md) 두 엔진을 계약 뒤에 두고 최종 선택 미루기
+- [0004](adr/0004-sources-and-coordinator.md) 모드 = 소스 플러그 조합 (§3.7의 근거)
+- [0005](adr/0005-portrait-locked-landscape-stage.md) 세로 고정 회전 스테이지 + iPad 네이티브 (§2.5의 근거)
+- [0006](adr/0006-uikit-multitouch-input.md) 멀티터치는 UIKit으로 (§3.4의 근거)
+
+**동작 원리 (tech-notes) — "이 기술이 어떻게 도나":**
+- [audio-pipeline](tech-notes/audio-pipeline.md) 합성·이중 엔진·세션 복구·사인파 함정
+- [haptics](tech-notes/haptics.md) 감쇠 진동(Core Haptics)·모드 C 진동 방향

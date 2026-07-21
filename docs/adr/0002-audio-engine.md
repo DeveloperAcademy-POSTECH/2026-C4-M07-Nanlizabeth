@@ -1,7 +1,8 @@
 # ADR 0002: 오디오 합성 엔진으로 AVAudioEngine 채택
 
 ## 상태
-채택됨 (Accepted)
+채택됨 (Accepted) · **확장됨 — [ADR 0003](0003-dual-audio-engine-behind-contract.md) 참고.**
+개발 중 AudioKit을 대안으로 함께 `GuitarAudioEngineProtocol` 뒤에 두고, 네이티브 vs AudioKit **최종 선택을 출시 직전으로 미루기로** 했다. 이 문서(0002)는 "네이티브를 왜 골랐나"의 근거로 유효하며, "왜 하나로 안 박고 둘 다 살려두나"는 0003이 이어 받는다.
 
 ## 맥락
 

@@ -49,9 +49,10 @@
 
 **볼 것 (체크리스트)**
 - [ ] `GuitarSync/Domain/Audio/` 전체 (`GuitarAudioEngineProtocol` / `Base` / `Native` / `AudioKit` / `Factory`)
-- [ ] `docs/tech-notes/audio-pipeline.md` (동작 원리)
-- [ ] `docs/adr/0002-audio-engine.md` (왜 이 기술)
-- [ ] ARCHITECTURE §3.1 (계약 + ⚠️ 지연·중단·폴리포니 보강 노트)
+- [ ] `Domain/Audio/AudioSessionController.swift` (전화·이어폰 등에서 소리 복구 — ✅ 구현됨)
+- [ ] `docs/tech-notes/audio-pipeline.md` (동작 원리 + 이중 엔진·세션 복구·사인파 함정)
+- [ ] `docs/adr/0002-audio-engine.md`(왜 AVAudioEngine) · `0003-dual-audio-engine-behind-contract.md`(왜 둘 다 살려두나)
+- [ ] ARCHITECTURE §3.1·§3.1.1 (계약 + ⚠️ 지연·중단·폴리포니 보강 노트)
 
 **🔧 얹으면 좋은 곁가지 — 성능 계측**
 - `thermalState`(발열)·CPU·**터치→소리 지연**을 자동 기록해서 **엔진을 데이터로 고르는 도구**(ROADMAP A2). "어느 엔진이 더 나은가"를 감이 아니라 숫자로 판정하는 방법.
@@ -73,8 +74,11 @@
 **볼 것 (체크리스트)**
 - [ ] `GuitarSync/Services/Multipeer/` (`MultipeerService` / `Protocol` / `MessageCodec`)
 - [ ] `GuitarSync/Models/PeerMessage.swift`, `PeerConnectionState.swift`
+- [ ] `Features/PeerConnect/PeerConnectViewModel.swift` (단일 세션 · 운지 송수신 · 재연결) + `Domain/Session/RemoteFingeringBridge.swift`
 - [ ] `docs/adr/0001-multipeer-connectivity.md`
 - [ ] ARCHITECTURE §3.8, SPEC 플로우 3
+
+> 💡 **모드 C가 실제로 도는 흐름:** iPhone이 짚은 운지를 계속 보내고(`sendFingering`), iPad가 받은 운지(`receivedFingering`)로 긁는 순간 소리 낸다. 소리·판정은 **긁는 기기(iPad)** 에서. 연결·송수신을 **하나의 세션**으로 묶은 이유와 "처음 한 번만 연결되던" 재연결 버그를 함께 보면 좋다.
 
 **🔧 얹으면 좋은 곁가지 — 원격 소스 & 끊김 처리**
 - 수신 메시지를 `RemoteFingeringSource`/`RemoteStrumSource`로 포장해서 **코디네이터(4번 영역)는 원격인지도 모르게** 만드는 방식 (§3.7·§3.8이 만나는 지점 → 4번 담당과 대화하면 좋음)
@@ -97,6 +101,7 @@
 - [ ] ROADMAP §1(두 원칙) · §7(용어 사전)
 - [ ] `GuitarSync/Services/Sound/MockSoundPreviewService.swift` ← **우리 프로젝트의 Mock 패턴 표본**
 - [ ] `GuitarSync/Domain/Audio/GuitarAudioEngineFactory.swift`, `Features/Shared/DebugAudioEngineToggle.swift`
+- [ ] `docs/adr/0005-portrait-locked-landscape-stage.md`(레이아웃 규약·회전) · `0006-uikit-multitouch-input.md`(멀티터치는 왜 UIKit) — **기반 결정의 근거**
 
 **🔧 얹으면 좋은 곁가지 — 디자인 시스템/토큰**
 - 색·여백·글자에 **이름을 붙여**(`Spacing = 16`) 숫자 직접 쓰기를 막는 규칙(`DesignSystem/Tokens/`). "왜 숫자를 직접 쓰면 안 되나"를 이해하는 좋은 소재.
@@ -116,6 +121,9 @@
 
 **볼 것 (체크리스트)**
 - [ ] ARCHITECTURE §3.4(운지↔UI 이벤트) · §3.5(스트럼) · §3.6(코드진행) · §3.7(소스·코디네이터)
+- [ ] `docs/adr/0004-sources-and-coordinator.md` ← **"모드 = 플러그 조합"의 결정 근거 (이 앱의 심장)**
+- [ ] `Domain/Session/` 전체 (`PlaySession`·`PlaySources`·`ChordPracticeSession`·`StrumPracticeSession`·`EnsembleStrummerSession`)
+- [ ] `Domain/Strum/StrumPatternPlayer.swift`·`Domain/Progression/ChordProgressionPlayer.swift` (박자 클럭에 구독하는 자동 플레이어)
 - [ ] `GuitarSync/Features/Strum/GuitarStrumViewModel.swift` (좌표→줄 매핑, 긁는 속도→세기)
 - [ ] SPEC §2(왼손×오른손 조합표) · §4(개별 발음 요구사항)
 
@@ -133,25 +141,29 @@
 
 | 햅틱 | 하는 일 | 왜 공부거리인가 |
 |------|--------|----------------|
-| **잘못된 코드 → 강한 진동** | 틀린 운지를 짚으면 강한 햅틱으로 "아니야!" 안내 | 단순 진동이 아니라 **"지금 짚은 운지(§3.4) vs 목표 코드(§3.3 카탈로그)를 비교하는 판정 로직"** 이 필요 → **접근성이 비즈니스 로직과 만나는 지점** |
-| **현 튕김 → 강→약 서서히 감쇠** | 튕긴 순간 강하게, 실제 기타 줄이 잦아들 듯 서서히 약해지는 진동 | 지금 코드로는 **불가능** → 진짜 학습 포인트 (아래) |
+| **잘못된 코드 → 강한 진동** (H3) | 틀린 운지를 짚으면 강한 햅틱으로 "아니야!" 안내 | 단순 진동이 아니라 **"지금 짚은 운지(§3.4) vs 목표 코드(§3.3 카탈로그)를 비교하는 판정 로직"** 이 필요 → **접근성이 비즈니스 로직과 만나는 지점.** ✅ `ChordJudge`·`ChordJudgmentController`로 **구현됨** (짚는 자리만 비교, 뮤트↔개방은 관대) |
+| **현 튕김 → 강→약 서서히 감쇠** (H2) | 튕긴 순간 강하게, 실제 기타 줄이 잦아들 듯 서서히 약해지는 진동 | `UIImpactFeedbackGenerator`로는 **불가능** → Core Haptics로 올라간 학습 포인트. ✅ `DecayHapticPlayer`로 **구현됨** (아래) |
 
-**⚠️ 핵심 — 지금 `HapticsManager`로는 감쇠 진동을 못 만듭니다**
-- 현재 `Services/Haptics/HapticsManager.swift`는 `UIImpactFeedbackGenerator`만 씁니다 → **딱 한 번 "툭"** 치는 것만 가능. 강→약으로 **서서히 변하는 곡선**을 못 그림
-- "서서히 잦아드는" 진동을 만들려면 **Core Haptics(`CHHapticEngine`)** 로 올라가야 합니다:
-  - **연속 이벤트(`CHHapticEvent .continuous`)** + **강도 감쇠 곡선(`CHHapticParameterCurve`, intensity)** 으로 실제 줄이 울리다 잦아드는 걸 흉내
-  - 이게 **오디오의 "음이 감쇠한다"와 1:1로 짝**을 이룸 → 소리(1번)와 나란히 놓고 보면 이해가 확 됨
-- 즉 이 영역의 학습 = **`UIImpactFeedbackGenerator` → Core Haptics로 발전시키기.**
+**⚠️ 핵심 학습 — 두 방식을 나란히 놓고 비교하라 (이제 둘 다 코드에 있다)**
+- `Services/Haptics/HapticsManager.swift`의 `UIImpactFeedbackGenerator`는 **딱 한 번 "툭"** — 강→약 곡선을 못 그림.
+- `Services/Haptics/DecayHapticPlayer.swift`가 **Core Haptics(`CHHapticEngine`)** 로 그걸 해냈다:
+  - **연속 이벤트(`CHHapticEvent .continuous`)** + **강도 감쇠 곡선(`CHHapticParameterCurve`)** 으로 실제 줄이 울리다 잦아드는 걸 흉내
+  - 이게 **오디오의 "음이 감쇠한다"와 1:1로 짝** → 소리(1번)와 나란히 놓고 보면 이해가 확 됨
+  - **함정도 같이 배운다:** 엔진이 조용히 멈추면 되살려야 한다(재생 직전 `ensureStarted`) — 안 그러면 약한 폴백만 남음.
+- 즉 이 영역의 학습 = **`UIImpactFeedbackGenerator` vs `DecayHapticPlayer`를 비교**하며 "왜 Core Haptics가 필요했나"를 이해하기. 원리 정리 → `docs/tech-notes/haptics.md`.
 
 **주의점 (문서에 이미 있음)**
 - **iPad는 햅틱 하드웨어가 없음** → 모드 C(긁는 기기=iPad)에서 진동을 못 줌. 기기별 대체 피드백(시각?) 설계가 학습 포인트 (SPEC §5.2 · §8 열린 결정)
 - 발음 햅틱은 **줄 애니메이션과 똑같은 이벤트(`notePlayed`)** 를 구독 → **화면 피드백과 짝으로** 봐야 함 (ARCHITECTURE §3.11, ROADMAP H1)
 
 **볼 것 (체크리스트)**
-- [ ] `GuitarSync/Services/Haptics/HapticsManager.swift` (현재 상태 → 발전 방향 비교)
+- [ ] `Services/Haptics/HapticsManager.swift` ↔ `DecayHapticPlayer.swift` (단발 vs 감쇠 — 나란히 비교)
+- [ ] `Services/Haptics/NotePlayedHaptics.swift` (`notePlayed` 구독 → 세기별 진동, 짧은 창에서 합침)
+- [ ] `Domain/Fingering/ChordJudge.swift`·`ChordJudgmentController.swift` (판정 햅틱 비교 로직)
+- [ ] `docs/tech-notes/haptics.md` (동작 원리 · 모드 C 진동 방향)
 - [ ] ARCHITECTURE §3.11(손맛·햅틱), SPEC §5.2(햅틱)
 - [ ] Apple 공식 문서: **Core Haptics**, `CHHapticEngine`, `CHHapticEvent`, `CHHapticParameterCurve`
-- [ ] (연계) §3.4의 `notePlayed` 이벤트 — 어디서 진동을 트리거받는지
+- [ ] (연계) §3.4의 `notePlayed` 이벤트 — 어디서 진동을 트리거받는지 (줄 애니메이션과 짝)
 
 **🔧 얹으면 좋은 곁가지 — 접근성 전반**
 - 이 영역이 한 사람 몫으로 가볍다 싶으면 **VoiceOver 라벨 · 다이내믹 타입(글자 크기) · 모션 줄이기** 같은 iOS 접근성 전반으로 넓히기. "장애가 있어도 쓸 수 있는 앱"이라는 관점 자체가 좋은 공부.
