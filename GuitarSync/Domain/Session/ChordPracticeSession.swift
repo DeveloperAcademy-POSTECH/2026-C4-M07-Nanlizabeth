@@ -45,7 +45,10 @@ final class ChordPracticeSession: ObservableObject {
     ///   - engine: 소리를 내는 엔진. 프리뷰·테스트에서 `nil`이면 조용히 조립만 된다.
     ///   - clock: 박자 심장. 테스트는 `MockBeatClock`을 넣는다.
     init(engine: GuitarAudioEngineProtocol?, clock: BeatClockProtocol? = nil) {
-        let fingeringState = FingeringState(audioEngine: engine, soundPolicy: .pluckOnPress)
+        // 짚기는 **소리를 내지 않는다**(`.silent`) — 그냥 코드를 잡을 뿐. 소리는 자동 주법이
+        // BPM대로 긁으며 낸다 (2026-07-21 결정, SPEC §4). 넥은 운지만 갱신하고, 그 운지를
+        // 코디네이터가 자동 스트럼 순간에 읽어 소리 낸다.
+        let fingeringState = FingeringState(audioEngine: engine, soundPolicy: .silent)
         let player = StrumPatternPlayer(clock: clock ?? BeatClock())
         let coordinator = PlaySessionCoordinator(audioEngine: engine)
 

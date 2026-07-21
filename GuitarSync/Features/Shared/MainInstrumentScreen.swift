@@ -67,27 +67,34 @@ struct MainInstrumentScreen: View {
             }
             #endif
         }
-        // 재생 버튼(▶) — 코드 모드의 자동 스트럼만 켜고 끈다.
-        // (스트럼 모드의 자동 코드진행은 재생 버튼과 무관하게 진행이 선택돼 있으면 늘 돈다.)
-        .onChange(of: viewModel.isPlaying) { _, playing in
-            guard viewModel.mode == .chord else { return }
-            if playing {
-                chordMode.play(pattern: patternToPlay, bpm: viewModel.bpm)
-            } else {
-                chordMode.stop()
+        // BPM을 바꾸면 도는 자동 연주(코드 모드=주법 / 스트럼 모드=진행)를 새 속도로 다시 맞춘다.
+        .onChange(of: viewModel.bpm) { _, _ in
+            switch viewModel.mode {
+            case .chord: refreshChordStrum()
+            case .strum: refreshStrumProgression()
             }
         }
-        // BPM을 바꾸면 도는 자동 진행을 새 속도로 다시 맞춘다.
-        .onChange(of: viewModel.bpm) { _, _ in
-            if viewModel.mode == .strum { refreshStrumProgression() }
-        }
-        // 연결되면 이 iPhone은 무음+진동, 자동 스트럼 정지 (소리는 iPad에서).
-        // 스트럼 모드면 연결 여부에 따라 자동 진행을 껐다(모드 C) 켰다(모드 B) 한다.
+        // 연결 여부에 따라 자동 연주를 껐다(모드 C) 켰다(모드 A·B) 한다.
         .onChange(of: peer.isConnected) { _, connected in
             chordMode.setConnected(connected)
-            if connected { viewModel.isPlaying = false }
-            if viewModel.mode == .strum { refreshStrumProgression() }
+            switch viewModel.mode {
+            case .chord: refreshChordStrum()
+            case .strum: refreshStrumProgression()
+            }
         }
+    }
+
+    /// 코드 모드(모드 A)의 자동 주법을 지금 조건에 맞게 켜거나 끈다.
+    ///
+    /// **재생 버튼과 무관하다** — 코드 화면에 있고 연결 안 됐으면 늘 돈다. 그래야 "코드를 짚어놓고
+    /// 있으면 고른 주법이 BPM대로 자동으로 긁으며 그 코드로 소리 나는" 연습이 된다 (짚기 자체는 무음).
+    /// 연결됐을 땐(모드 C) 돌리지 않는다 — 소리는 iPad에서 나기 때문.
+    private func refreshChordStrum() {
+        guard !peer.isConnected else {
+            chordMode.stop()
+            return
+        }
+        chordMode.play(pattern: patternToPlay, bpm: viewModel.bpm)
     }
 
     /// 스트럼 모드(모드 B)의 자동 코드진행을 지금 조건에 맞게 켜거나 끈다.
@@ -120,8 +127,9 @@ struct MainInstrumentScreen: View {
     private var instrument: some View {
         switch viewModel.mode {
         case .chord:
-            // 모드 A/C — 넥으로 짚는다. 단독이면 개별 발음(SPEC §4) + 재생 시 자동 스트럼.
-            // 연결되면 무음+진동으로 바뀌고, 운지는 상대(iPad)로 전송돼 거기서 소리가 난다.
+            // 모드 A/C — 넥으로 짚는다. **짚기 자체는 무음**이고, 단독이면 고른 주법이 BPM대로
+            // 자동으로 긁으며 그 코드로 소리 낸다 (스트로크 모드가 진행을 자동으로 돌리는 것과 대칭).
+            // 연결되면 자동 스트럼을 멈추고, 운지는 상대(iPad)로 전송돼 거기서 소리가 난다.
             NeckScreen(
                 viewModel: chordMode.neck,
                 onFingeringChanged: { peer.sendFingering($0) }
@@ -130,6 +138,11 @@ struct MainInstrumentScreen: View {
                 .onAppear {
                     chordMode.start()
                     chordMode.setConnected(peer.isConnected)
+                    refreshChordStrum()   // 단독이면 자동 주법이 바로 돌기 시작
+                }
+                // 주법을 새로 고르면 그 주법으로 바로 갈아탄다.
+                .onChange(of: selectedStrumPattern) { _, _ in
+                    refreshChordStrum()
                 }
                 .onDisappear {
                     chordMode.end()
