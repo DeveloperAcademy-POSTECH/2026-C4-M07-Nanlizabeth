@@ -328,5 +328,6 @@ gantt
 
 ### 관련 문서
 - 제품 명세(모드·플로우·화면·온보딩 제약) → [SPEC.md](SPEC.md)
-- 폴더 구조·계약 카탈로그·병렬 방법 → [ARCHITECTURE.md](ARCHITECTURE.md)
-- 왜 이 기술을 골랐나 → `docs/adr/` · 오디오 동작 원리 → `docs/tech-notes/audio-pipeline.md`
+- 폴더 구조·계약 카탈로그·병렬 방법 → [ARCHITECTURE.md](ARCHITECTURE.md) (끝에 **ADR·tech-notes 전체 목록** 있음)
+- 왜 이렇게 정했나(ADR) → [0001 통신](adr/0001-multipeer-connectivity.md) · [0002·0003 오디오 엔진](adr/0003-dual-audio-engine-behind-contract.md) · [0004 소스·코디네이터](adr/0004-sources-and-coordinator.md) · [0005 레이아웃](adr/0005-portrait-locked-landscape-stage.md) · [0006 멀티터치](adr/0006-uikit-multitouch-input.md)
+- 동작 원리 → [audio-pipeline](tech-notes/audio-pipeline.md) · [haptics](tech-notes/haptics.md)
