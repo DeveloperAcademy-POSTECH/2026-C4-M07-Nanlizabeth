@@ -8,25 +8,32 @@ struct ChordEntry: Equatable, Identifiable {
     let root: String
     /// 운지. `-1`=뮤트 · `0`=개방현 · `1~`=프렛 (ARCHITECTURE §5 규약)
     let fingering: GuitarFingering
+    /// **어느 손가락으로 짚는가.** 줄마다 하나씩(6개). `0`=안 짚음(개방·뮤트) · `1`=검지 · `2`=중지 ·
+    /// `3`=약지 · `4`=새끼. 같은 번호가 이어진 여러 줄이면 **한 손가락(바레)**이라는 뜻.
+    /// 비워두면(`[]`) 번호 안내를 하지 않는다.
+    let fingers: [Int]
 
     var id: String { chord.id }
 
-    init(chord: GuitarChord, root: String, fingering: GuitarFingering) {
+    init(chord: GuitarChord, root: String, fingering: GuitarFingering, fingers: [Int] = []) {
         self.chord = chord
         self.root = root
         self.fingering = fingering
+        self.fingers = fingers
     }
 
     /// 데이터 표를 짧게 적기 위한 편의 생성자.
     ///
     /// ```swift
-    /// ChordEntry("Am", root: "A", frets: [-1, 0, 2, 2, 1, 0])
+    /// ChordEntry("Am", root: "A", frets: [-1, 0, 2, 2, 1, 0], fingers: [0, 0, 2, 3, 1, 0])
+    /// //                                  ↑운지                     ↑손가락(0=안짚음 1검지 2중지 3약지 4새끼)
     /// ```
-    init(_ name: String, root: String, frets: [Int]) {
+    init(_ name: String, root: String, frets: [Int], fingers: [Int] = []) {
         self.init(
             chord: GuitarChord(name),
             root: root,
-            fingering: GuitarFingering(frets: frets)
+            fingering: GuitarFingering(frets: frets),
+            fingers: fingers
         )
     }
 }
@@ -45,6 +52,9 @@ protocol ChordCatalogProtocol {
     /// 운지 조회. 사전에 없으면 `nil`.
     func fingering(for chord: GuitarChord) -> GuitarFingering?
 
+    /// 손가락 번호 조회 (줄마다 하나씩). 데이터가 없으면 빈 배열.
+    func fingers(for chord: GuitarChord) -> [Int]
+
     /// 근음으로 거르기 (선택 화면의 "C" 탭 등).
     func chords(root: String) -> [GuitarChord]
 
@@ -62,12 +72,17 @@ final class ChordCatalog: ChordCatalogProtocol {
     let entries: [ChordEntry]
 
     private let fingeringsByChord: [GuitarChord: GuitarFingering]
+    private let fingersByChord: [GuitarChord: [Int]]
 
     init(entries: [ChordEntry]) {
         self.entries = entries
         // 같은 이름이 두 번 적혀도 먼저 적힌 쪽이 이긴다 (표의 위쪽이 정답).
         self.fingeringsByChord = Dictionary(
             entries.map { ($0.chord, $0.fingering) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        self.fingersByChord = Dictionary(
+            entries.map { ($0.chord, $0.fingers) },
             uniquingKeysWith: { first, _ in first }
         )
     }
@@ -81,6 +96,10 @@ final class ChordCatalog: ChordCatalogProtocol {
 
     func fingering(for chord: GuitarChord) -> GuitarFingering? {
         fingeringsByChord[chord]
+    }
+
+    func fingers(for chord: GuitarChord) -> [Int] {
+        fingersByChord[chord] ?? []
     }
 
     func chords(root: String) -> [GuitarChord] {
@@ -114,6 +133,8 @@ final class MockChordCatalog: ChordCatalogProtocol {
     func fingering(for chord: GuitarChord) -> GuitarFingering? {
         allChords.contains(chord) ? stubFingering : nil
     }
+
+    func fingers(for chord: GuitarChord) -> [Int] { [] }
 
     func chords(root: String) -> [GuitarChord] {
         allChords.filter { $0.rawValue.hasPrefix(root) }

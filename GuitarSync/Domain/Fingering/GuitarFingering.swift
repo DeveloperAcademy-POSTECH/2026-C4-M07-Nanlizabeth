@@ -54,4 +54,10 @@ extension GuitarChord {
     var fingering: GuitarFingering {
         ChordCatalog.shared.fingering(for: self) ?? .open
     }
+
+    /// 이 코드를 짚는 손가락 번호(줄마다 하나). `0`=안 짚음 · `1`검지 · `2`중지 · `3`약지 · `4`새끼.
+    /// 데이터가 없으면 빈 배열. **실제 데이터는 `Content/ChordCatalogData.swift`에 있다.**
+    var fingers: [Int] {
+        ChordCatalog.shared.fingers(for: self)
+    }
 }

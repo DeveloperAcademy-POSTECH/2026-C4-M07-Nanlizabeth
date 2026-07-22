@@ -22,6 +22,9 @@ struct NeckScreen: View {
     /// (코드 드릴이 넣는다. 자유연주 모드 A는 `nil` — 오버레이 없음.)
     var targetFingering: GuitarFingering? = nil
 
+    /// 목표 코드의 손가락 번호(줄마다 하나). 있으면 고스트 위에 번호를 함께 안내한다.
+    var targetFingers: [Int] = []
+
     var body: some View {
         ZStack {
             board
@@ -139,16 +142,30 @@ struct NeckScreen: View {
     @ViewBuilder
     private var targetMarkers: some View {
         if let target = targetFingering {
-            ForEach(NeckGeometry.fingerMarkers(frettedByString: Self.frettedByString(target))) { marker in
+            ForEach(NeckGeometry.chordDiagramMarkers(frets: target.frets, fingers: targetFingers)) { marker in
                 Capsule()
-                    .fill(Color.gsAccent.opacity(0.14))
+                    .fill(Color.gsAccent.opacity(0.16))
                     .overlay(Capsule().stroke(Color.gsAccent, lineWidth: 2.5))
                     .frame(width: marker.size.width, height: marker.size.height)
+                    .overlay(fingerLabel(marker))
                     .position(marker.center)
             }
             ForEach(Array(target.frets.enumerated()), id: \.offset) { index, fret in
                 openMuteHint(stringIndex: index, fret: fret)
             }
+        }
+    }
+
+    /// 표식 안에 그릴 손가락 번호. `0`이면 아무것도 안 그린다.
+    /// 바레(타원)면 번호를 위쪽에 한 번만, 원이면 한가운데에 둔다.
+    @ViewBuilder
+    private func fingerLabel(_ marker: NeckGeometry.FingerMarker) -> some View {
+        if marker.finger > 0 {
+            Text("\(marker.finger)")
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.gsTextPrimary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: marker.isBarre ? .top : .center)
+                .padding(.top, marker.isBarre ? 4 : 0)
         }
     }
 
@@ -176,15 +193,6 @@ struct NeckScreen: View {
         var result: [Int: Int] = [:]
         for press in viewModel.activePresses where press.fret >= 1 {
             result[press.stringIndex] = max(result[press.stringIndex] ?? 0, press.fret)
-        }
-        return result
-    }
-
-    /// 운지 → 줄:프렛 매핑(프렛 1 이상만). 목표 오버레이용.
-    private static func frettedByString(_ fingering: GuitarFingering) -> [Int: Int] {
-        var result: [Int: Int] = [:]
-        for (index, fret) in fingering.frets.enumerated() where fret >= 1 {
-            result[index] = fret
         }
         return result
     }

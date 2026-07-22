@@ -169,6 +169,8 @@ enum NeckGeometry {
         let size: CGSize
         /// 여러 줄에 걸친 바레(타원)인가. 아니면 원(가로세로 같음).
         let isBarre: Bool
+        /// 손가락 번호(1~4). `0`이면 번호를 표시하지 않는다 (짚기 피드백 등).
+        var finger: Int = 0
     }
 
     /// 줄→프렛 매핑(프렛 1 이상만)을 원/바레 표식으로 바꾼다. (docs/PLAN-chord-drill 개선)
@@ -201,6 +203,59 @@ enum NeckGeometry {
                         isBarre: isBarre
                     )
                 )
+            }
+        }
+        return markers
+    }
+
+    /// **코드 다이어그램용 표식** — 손가락 번호를 달아 "어느 줄을 몇 번 손가락으로" 안내한다.
+    /// (docs/PLAN-chord-drill 개선 — 운지 손가락 안내)
+    ///
+    /// - **바레(타원)**는 *같은 손가락*이 **연속된 3줄 이상**을 누를 때만 만든다.
+    ///   F처럼 검지가 6번줄과 1·2번줄에 떨어져 걸치면(가운데는 다른 손가락이 위에서 누름)
+    ///   연속 구간이 2줄 이하라 **원 여러 개**로 나뉘어, 각 줄을 또렷이 짚도록 안내한다.
+    /// - `frets`는 6개 운지(`-1`뮤트·`0`개방·`1~`프렛), `fingers`는 6개 손가락(`0`안짚음·`1~4`).
+    static func chordDiagramMarkers(frets: [Int], fingers: [Int]) -> [FingerMarker] {
+        struct Key: Hashable { let fret: Int; let finger: Int }
+
+        var byKey: [Key: [Int]] = [:]
+        for index in stringYs.indices where frets.indices.contains(index) && frets[index] >= 1 {
+            let finger = fingers.indices.contains(index) ? fingers[index] : 0
+            byKey[Key(fret: frets[index], finger: finger), default: []].append(index)
+        }
+
+        var markers: [FingerMarker] = []
+        for (key, strings) in byKey {
+            guard let x = fretCenterX(key.fret) else { continue }
+            for run in contiguousRuns(strings.sorted()) {
+                let spanned = run.end - run.start + 1
+                if spanned >= 3 {
+                    // 같은 손가락이 3줄 이상 → 바레 타원 하나.
+                    let yTop = stringYs[run.start]
+                    let yBottom = stringYs[run.end]
+                    markers.append(
+                        FingerMarker(
+                            id: "barre-\(key.fret)-\(key.finger)-\(run.start)",
+                            center: CGPoint(x: x, y: (yTop + yBottom) / 2),
+                            size: CGSize(width: pressMarkerDiameter, height: (yBottom - yTop) + pressMarkerDiameter),
+                            isBarre: true,
+                            finger: key.finger
+                        )
+                    )
+                } else {
+                    // 1~2줄 → 각 줄을 원으로 (F의 바깥 두 줄 등).
+                    for stringIndex in run.start...run.end {
+                        markers.append(
+                            FingerMarker(
+                                id: "dot-\(key.fret)-\(key.finger)-\(stringIndex)",
+                                center: CGPoint(x: x, y: stringYs[stringIndex]),
+                                size: CGSize(width: pressMarkerDiameter, height: pressMarkerDiameter),
+                                isBarre: false,
+                                finger: key.finger
+                            )
+                        )
+                    }
+                }
             }
         }
         return markers
