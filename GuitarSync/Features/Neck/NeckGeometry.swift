@@ -73,6 +73,28 @@ enum NeckGeometry {
         return FretPress(stringIndex: stringIndex, fret: fret)
     }
 
+    /// 접촉 반지름이 클수록 세로로 더 넓은 줄 범위를 덮는 정도. (바레 감도)
+    /// 값이 클수록 손가락을 살짝만 눕혀도 이웃 줄이 함께 잡힌다.
+    static let barreRadiusScale: CGFloat = 1.4
+
+    /// 터치 한 개(중심 + 접촉 반지름) → 짚은 칸들. **넓게 누르면(바레) 세로로 인접한 여러 줄**을
+    /// 같은 프렛으로 함께 짚은 것으로 본다. (docs/PLAN-chord-drill 개선 — 한 손가락 바레 입력)
+    ///
+    /// 접촉이 작으면(지문 하나) 가장 가까운 줄 하나만 — 기존 동작과 같다(회귀 없음).
+    static func presses(at point: CGPoint, majorRadius: CGFloat) -> [FretPress] {
+        guard point.y >= boardTop, point.y <= boardBottom, let fret = fret(atX: point.x) else {
+            return []
+        }
+
+        let halfBand = majorRadius * barreRadiusScale
+        var covered = stringYs.indices.filter { abs(stringYs[$0] - point.y) <= halfBand }
+        // 접촉이 작아 아무 줄도 안 걸리면, 가장 가까운 줄 하나로 친다.
+        if covered.isEmpty, let nearest = stringIndex(atY: point.y) {
+            covered = [nearest]
+        }
+        return covered.map { FretPress(stringIndex: $0, fret: fret) }
+    }
+
     /// 세로 위치 → 줄 번호.
     ///
     /// **줄 위를 정확히 짚을 필요는 없다.** 가장 가까운 줄로 쳐서 줄 사이 공간을 반씩 나눠 갖는다 —

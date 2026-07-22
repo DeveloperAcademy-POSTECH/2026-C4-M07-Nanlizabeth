@@ -13,6 +13,16 @@ struct TouchID: Hashable {
     }
 }
 
+/// 터치 한 개의 상세 — 위치 + **접촉 면적 반지름**.
+///
+/// 손가락을 눕혀 넓게 누르면 `majorRadius`가 커진다. 이 값으로 **바레(손가락 하나로 여러 줄)**를
+/// 감지한다 — 화면 넥이 실제 프렛보다 커서, 넓은 접촉을 세로로 인접한 여러 줄에 나눠 준다.
+struct TouchSample: Equatable {
+    let location: CGPoint
+    /// 접촉 면적의 추정 반지름(pt). 지문 하나는 작고, 눕힌 손가락은 크다.
+    let majorRadius: CGFloat
+}
+
 /// 멀티터치를 그대로 넘겨주는 투명 레이어.
 ///
 /// ## 왜 필요한가
@@ -33,25 +43,30 @@ struct TouchID: Hashable {
 /// }
 /// ```
 struct MultiTouchLayer: UIViewRepresentable {
-    /// 지금 닿아 있는 손가락 전부. 손을 다 떼면 빈 사전이 온다.
-    let onTouchesChanged: ([TouchID: CGPoint]) -> Void
+    /// 접촉 반지름까지 담은 상세 스냅샷. **바레를 쓰려면 이걸 받는다** (넥 화면).
+    var onSamplesChanged: (([TouchID: TouchSample]) -> Void)? = nil
+    /// 위치만 담은 간단 스냅샷. 반지름이 필요 없는 화면(스트럼)이 쓴다. 트레일링 클로저가 여기로 묶인다.
+    var onTouchesChanged: (([TouchID: CGPoint]) -> Void)? = nil
 
     func makeUIView(context: Context) -> MultiTouchView {
         let view = MultiTouchView()
+        view.onSamplesChanged = onSamplesChanged
         view.onTouchesChanged = onTouchesChanged
         return view
     }
 
     func updateUIView(_ uiView: MultiTouchView, context: Context) {
+        uiView.onSamplesChanged = onSamplesChanged
         uiView.onTouchesChanged = onTouchesChanged
     }
 }
 
 /// 실제 터치를 받는 UIKit 뷰. 좌표의 **의미 해석은 하지 않는다** — 그건 쓰는 쪽 몫이다.
 final class MultiTouchView: UIView {
+    var onSamplesChanged: (([TouchID: TouchSample]) -> Void)?
     var onTouchesChanged: (([TouchID: CGPoint]) -> Void)?
 
-    private var touchPoints: [TouchID: CGPoint] = [:]
+    private var samples: [TouchID: TouchSample] = [:]
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -84,15 +99,23 @@ final class MultiTouchView: UIView {
 
     private func updatePositions(of touches: Set<UITouch>) {
         for touch in touches {
-            touchPoints[TouchID(touch)] = touch.location(in: self)
+            samples[TouchID(touch)] = TouchSample(
+                location: touch.location(in: self),
+                majorRadius: touch.majorRadius
+            )
         }
-        onTouchesChanged?(touchPoints)
+        emit()
     }
 
     private func forget(_ touches: Set<UITouch>) {
         for touch in touches {
-            touchPoints.removeValue(forKey: TouchID(touch))
+            samples.removeValue(forKey: TouchID(touch))
         }
-        onTouchesChanged?(touchPoints)
+        emit()
+    }
+
+    private func emit() {
+        onSamplesChanged?(samples)
+        onTouchesChanged?(samples.mapValues(\.location))
     }
 }

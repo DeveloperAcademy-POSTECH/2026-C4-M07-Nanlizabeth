@@ -31,11 +31,14 @@ struct NeckScreen: View {
             targetMarkers
             pressMarkers
 
-            // 맨 위에 깔아 손가락을 전부 받는다. 지판 밖 터치는 `NeckGeometry.press(at:)`가 걸러낸다.
-            // 좌표를 "몇 번 줄 몇 프렛"으로 바꾸는 건 여기서 하고, 레이어는 손가락만 세어 준다.
-            MultiTouchLayer { touches in
-                viewModel.pressesChanged(Set(touches.values.compactMap(NeckGeometry.press(at:))))
-            }
+            // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
+            // 지판 밖 터치는 `NeckGeometry.presses(at:majorRadius:)`가 걸러낸다.
+            MultiTouchLayer(onSamplesChanged: { samples in
+                let presses = samples.values.flatMap {
+                    NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)
+                }
+                viewModel.pressesChanged(Set(presses))
+            })
         }
         .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
         .onChange(of: viewModel.fingering) { _, fingering in
