@@ -15,8 +15,11 @@ struct ChordDrillScreen: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            NeckScreen(viewModel: controller.neck)
-                .ignoresSafeArea()
+            NeckScreen(
+                viewModel: controller.neck,
+                targetFingering: controller.currentChord.fingering
+            )
+            .ignoresSafeArea()
 
             hud
         }

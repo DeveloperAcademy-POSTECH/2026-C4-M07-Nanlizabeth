@@ -134,4 +134,72 @@ enum NeckGeometry {
     static func stringThickness(_ stringIndex: Int) -> CGFloat {
         stringIndex < 3 ? 4 : 3
     }
+
+    // MARK: - 짚은 자리 표식 (원 / 바레 타원)
+
+    /// 개방현(○)·뮤트(✕) 힌트를 찍는 가로 위치 — 너트 바로 오른쪽 바깥.
+    static let openMuteHintX: CGFloat = 858
+
+    /// 짚은 자리를 그릴 표식 하나. 한 프렛에서 **인접한 여러 줄**이면 타원(바레), 한 줄이면 원.
+    struct FingerMarker: Equatable, Identifiable {
+        let id: String
+        let center: CGPoint
+        let size: CGSize
+        /// 여러 줄에 걸친 바레(타원)인가. 아니면 원(가로세로 같음).
+        let isBarre: Bool
+    }
+
+    /// 줄→프렛 매핑(프렛 1 이상만)을 원/바레 표식으로 바꾼다. (docs/PLAN-chord-drill 개선)
+    ///
+    /// - 같은 프렛에서 **연속된 줄**은 하나의 타원(바레)으로 묶는다 — F 코드처럼 손가락 하나로
+    ///   여러 줄을 누르는 모습.
+    /// - 한 줄만이면 원. (원은 폭·높이가 같은 캡슐이라 자연히 동그랗다.)
+    static func fingerMarkers(frettedByString: [Int: Int]) -> [FingerMarker] {
+        var byFret: [Int: [Int]] = [:]
+        for (stringIndex, fret) in frettedByString where fret >= 1 {
+            byFret[fret, default: []].append(stringIndex)
+        }
+
+        var markers: [FingerMarker] = []
+        for (fret, strings) in byFret {
+            guard let x = fretCenterX(fret) else { continue }
+            for run in contiguousRuns(strings.sorted()) {
+                guard stringYs.indices.contains(run.start), stringYs.indices.contains(run.end) else { continue }
+                let yTop = stringYs[run.start]
+                let yBottom = stringYs[run.end]
+                let isBarre = run.end > run.start
+                markers.append(
+                    FingerMarker(
+                        id: "\(fret)-\(run.start)-\(run.end)",
+                        center: CGPoint(x: x, y: (yTop + yBottom) / 2),
+                        size: CGSize(
+                            width: pressMarkerDiameter,
+                            height: isBarre ? (yBottom - yTop) + pressMarkerDiameter : pressMarkerDiameter
+                        ),
+                        isBarre: isBarre
+                    )
+                )
+            }
+        }
+        return markers
+    }
+
+    /// 정렬된 정수 목록을 **연속 구간**들로 나눈다. 예: `[0,1,2,4,5]` → `[(0,2),(4,5)]`.
+    static func contiguousRuns(_ sorted: [Int]) -> [(start: Int, end: Int)] {
+        guard let first = sorted.first else { return [] }
+        var runs: [(start: Int, end: Int)] = []
+        var start = first
+        var prev = first
+        for value in sorted.dropFirst() {
+            if value == prev + 1 {
+                prev = value
+            } else {
+                runs.append((start, prev))
+                start = value
+                prev = value
+            }
+        }
+        runs.append((start, prev))
+        return runs
+    }
 }
