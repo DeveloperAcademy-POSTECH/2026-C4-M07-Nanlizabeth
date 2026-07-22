@@ -157,15 +157,24 @@ struct NeckScreen: View {
     }
 
     /// 표식 안에 그릴 손가락 번호. `0`이면 아무것도 안 그린다.
-    /// 바레(타원)면 번호를 위쪽에 한 번만, 원이면 한가운데에 둔다.
+    ///
+    /// 숫자 **뒤에만 어두운 칩**(넥 색)을 깔아, 칩이 그 자리 줄을 가려서 안 짚은 상태에서도
+    /// 숫자가 또렷이 읽힌다. 칩은 어두운 색이라 짚었을 때의 라임 피드백과 겹치지 않는다.
+    /// 바레(타원)면 위쪽에 한 번만, 원이면 한가운데에 둔다.
     @ViewBuilder
     private func fingerLabel(_ marker: NeckGeometry.FingerMarker) -> some View {
         if marker.finger > 0 {
-            Text("\(marker.finger)")
-                .font(.system(size: 16, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.gsTextPrimary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: marker.isBarre ? .top : .center)
-                .padding(.top, marker.isBarre ? 4 : 0)
+            ZStack {
+                Circle()
+                    .fill(Color.gsNeckSurface)
+                    .overlay(Circle().stroke(Color.gsAccent.opacity(0.5), lineWidth: 1))
+                    .frame(width: 22, height: 22)
+                Text("\(marker.finger)")
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.gsAccent)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: marker.isBarre ? .top : .center)
+            .padding(.top, marker.isBarre ? 5 : 0)
         }
     }
 
