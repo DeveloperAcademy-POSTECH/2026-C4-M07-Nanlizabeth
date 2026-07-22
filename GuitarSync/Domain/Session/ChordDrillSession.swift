@@ -55,6 +55,10 @@ final class ChordDrillSession: ObservableObject {
             guard let self, let target = self.target else { return true }
             return ChordJudge.matches(played: fingering.frets, target: target.fingering.frets)
         }
+
+        // 실제로 울릴 줄은 **목표 코드의 보이싱**으로 정한다 — 안 치는 줄(뮤트 X)은 소리도
+        // 줄 떨림도 나지 않는다. 짚기 자체가 무음이라 자유 개방현이 섞일 일도 없다.
+        coordinator.voicingOverride = { [weak self] in self?.target?.fingering }
     }
 
     // MARK: - 수명주기

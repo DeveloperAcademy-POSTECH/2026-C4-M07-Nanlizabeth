@@ -115,6 +115,13 @@ final class PlaySessionCoordinator: ObservableObject {
     /// 줄 떨림·햅틱(`notePlayed`)도 나가지 않는다.
     var soundGate: ((GuitarFingering) -> Bool)?
 
+    /// **소리·시각 피드백에 쓸 보이싱 대체.** (docs/PLAN-chord-drill 개선 — 안 치는 줄은 안 울린다)
+    ///
+    /// 판정(게이트)은 실제 짚은 운지로 하되, **실제로 울릴 줄**은 이 값으로 정한다. 코드 드릴이
+    /// 목표 코드의 뮤트(X)까지 담은 보이싱을 넣으면, 안 치는 줄은 소리도 줄 떨림도 나지 않는다.
+    /// `nil`이면 짚은 운지 그대로 — 기존 모드(A·B·C)는 건드리지 않으므로 동작이 그대로다.
+    var voicingOverride: (() -> GuitarFingering?)?
+
     private let notePlayedSubject = PassthroughSubject<NotePlayedEvent, Never>()
     private let audioEngine: GuitarAudioEngineProtocol?
 
@@ -162,9 +169,11 @@ final class PlaySessionCoordinator: ObservableObject {
 
     private func handleStrum(_ occurrence: StrumOccurrence) {
         // ★ 여기가 핵심 — "긁은 그 순간"의 운지를 읽는다.
-        let fingering = fingeringSource?.currentFingering ?? .open
+        let played = fingeringSource?.currentFingering ?? .open
         // 게이트가 닫혀 있으면 이 획은 통째로 무음 — 소리도, 줄 떨림·햅틱 방송도 없다.
-        guard soundGate?(fingering) ?? true else { return }
+        guard soundGate?(played) ?? true else { return }
+        // 판정은 짚은 운지로, 실제 울림은 보이싱으로 — 안 치는 줄(뮤트)은 여기서 빠진다.
+        let fingering = voicingOverride?() ?? played
         lastPlayedFingering = fingering
 
         audioEngine?.strum(
@@ -192,8 +201,9 @@ final class PlaySessionCoordinator: ObservableObject {
     }
 
     private func handlePluck(_ occurrence: PluckOccurrence) {
-        let fingering = fingeringSource?.currentFingering ?? .open
-        guard soundGate?(fingering) ?? true else { return }
+        let played = fingeringSource?.currentFingering ?? .open
+        guard soundGate?(played) ?? true else { return }
+        let fingering = voicingOverride?() ?? played
         guard fingering.isAudible(stringIndex: occurrence.stringIndex),
               let fret = fingering.fret(for: occurrence.stringIndex)
         else { return }
