@@ -29,19 +29,20 @@ final class ChordDrillSession: ObservableObject {
     }
 
     private let engine: GuitarAudioEngineProtocol?
-    private let player: StrumPatternPlayer
+    private let player: PickPatternPlayer
     private let coordinator: PlaySessionCoordinator
 
     init(engine: GuitarAudioEngineProtocol?, clock: BeatClockProtocol? = nil) {
-        // 짚기는 무음 — 소리는 자동 주법이 게이트를 통과할 때만 낸다. (모드 A와 동일한 조립)
+        // 짚기는 무음 — 소리는 자동 피킹이 게이트를 통과할 때만 낸다. (모드 A와 같은 조립)
         let fingeringState = FingeringState(audioEngine: engine, soundPolicy: .silent)
-        let player = StrumPatternPlayer(clock: clock ?? BeatClock())
+        // 코드를 통째로 긁는 대신 **노래마다 정한 순서로 줄을 하나씩** 튕긴다.
+        let player = PickPatternPlayer(clock: clock ?? BeatClock())
         let coordinator = PlaySessionCoordinator(audioEngine: engine)
 
         coordinator.setSources(
             mode: .chordPractice,
             fingering: ManualFingeringSource(state: fingeringState),
-            strum: AutoStrumSource(player: player)
+            strum: player
         )
 
         self.engine = engine
@@ -65,10 +66,10 @@ final class ChordDrillSession: ObservableObject {
 
     func startEngine() { engine?.start() }
 
-    /// 자동 주법을 시작한다. 화면 진입 시 부른다 (모드 A처럼 재생 버튼이 아니라 진입 시 자동으로 돈다).
-    func play(pattern: StrumPattern, bpm: Double? = nil) {
+    /// 자동 피킹을 시작한다. 화면 진입 시 부른다 (모드 A처럼 재생 버튼이 아니라 진입 시 자동으로 돈다).
+    func play(pick: PickPattern, bpm: Double? = nil) {
         player.bpmOverride = bpm
-        player.play(pattern: pattern, looping: true)
+        player.play(pick, looping: true)
     }
 
     func stopPlaying() { player.stop() }

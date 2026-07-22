@@ -204,19 +204,25 @@ final class PlaySessionCoordinator: ObservableObject {
         let played = fingeringSource?.currentFingering ?? .open
         guard soundGate?(played) ?? true else { return }
         let fingering = voicingOverride?() ?? played
-        guard fingering.isAudible(stringIndex: occurrence.stringIndex),
-              let fret = fingering.fret(for: occurrence.stringIndex)
+
+        // 음수 줄 번호는 "베이스" 신호 — 그 코드의 가장 낮은 울리는 줄로 푼다 (코드마다 다르므로).
+        let stringIndex = occurrence.stringIndex >= 0
+            ? occurrence.stringIndex
+            : (fingering.lowestAudibleString ?? occurrence.stringIndex)
+
+        guard fingering.isAudible(stringIndex: stringIndex),
+              let fret = fingering.fret(for: stringIndex)
         else { return }
 
         lastPlayedFingering = fingering
         audioEngine?.pluckString(
-            stringIndex: occurrence.stringIndex,
+            stringIndex: stringIndex,
             fretNumber: fret,
             velocity: occurrence.velocity
         )
         notePlayedSubject.send(
             NotePlayedEvent(
-                stringIndex: occurrence.stringIndex,
+                stringIndex: stringIndex,
                 fret: fret,
                 velocity: occurrence.velocity
             )

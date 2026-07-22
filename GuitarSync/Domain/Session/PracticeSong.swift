@@ -11,6 +11,15 @@ struct PracticeSong: Identifiable, Equatable {
     let level: String
     /// 순서대로 출제할 코드 진행.
     let chords: [GuitarChord]
+    /// **튕기는 순서(피킹 패턴).** 정답 코드일 때 이 순서대로 소리가 난다 — 노래마다 다른 리듬·느낌.
+    let pick: PickPattern
+
+    init(title: String, level: String, chords: [GuitarChord], pick: PickPattern = .bassStrum) {
+        self.title = title
+        self.level = level
+        self.chords = chords
+        self.pick = pick
+    }
 
     var id: String { title }
 

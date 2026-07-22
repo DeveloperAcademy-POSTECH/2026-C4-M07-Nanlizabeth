@@ -33,6 +33,12 @@ struct GuitarFingering: Equatable, Hashable, Codable {
     var isSilent: Bool {
         frets.allSatisfy { $0 < 0 }
     }
+
+    /// **가장 낮은(굵은) 울리는 줄** — 코드의 베이스. 전부 뮤트면 `nil`.
+    /// (인덱스 0 = 6번줄이 가장 낮은 음이므로 앞에서부터 찾는다.)
+    var lowestAudibleString: Int? {
+        frets.firstIndex { $0 >= 0 }
+    }
 }
 
 extension GuitarFingering {

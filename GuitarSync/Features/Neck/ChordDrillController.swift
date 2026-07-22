@@ -81,9 +81,9 @@ final class ChordDrillController: ObservableObject {
 
     func start() { session.startEngine() }
 
-    /// 자동 주법을 켠다. 화면 진입 시 부른다.
-    func play(pattern: StrumPattern, bpm: Double? = nil) {
-        session.play(pattern: pattern, bpm: bpm)
+    /// 자동 피킹을 켠다. 화면 진입 시 부른다. 노래마다 튕기는 순서(패턴)가 다르다.
+    func play(pick: PickPattern, bpm: Double? = nil) {
+        session.play(pick: pick, bpm: bpm)
     }
 
     func end() {

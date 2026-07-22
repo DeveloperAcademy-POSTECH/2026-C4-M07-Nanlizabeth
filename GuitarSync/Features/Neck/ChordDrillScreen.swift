@@ -30,8 +30,8 @@ struct ChordDrillScreen: View {
         .onAppear {
             controller.load(song.drill)   // 고른 노래의 진행으로 채운다
             controller.start()
-            // 화면에 들어오면 자동 주법이 바로 돈다 (모드 A와 동일). 정답일 때만 소리가 난다.
-            controller.play(pattern: StrumPatternLibrary().presets.first ?? .fallback, bpm: 80)
+            // 화면에 들어오면 노래의 피킹 패턴이 바로 돈다. 정답 코드일 때만 그 순서대로 소리가 난다.
+            controller.play(pick: song.pick)
         }
         .onDisappear { controller.end() }
         .onChange(of: controller.correctFlash) { _, _ in showFlash() }

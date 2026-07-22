@@ -15,15 +15,15 @@
 enum PracticeSongData {
     static let songs: [PracticeSong] = [
         // ── 입문 : 코드 2개 ─────────────────────────────────────────
-        PracticeSong(title: "떴다 떴다 비행기", level: "입문", chords: ["C", "G"]),
+        PracticeSong(title: "떴다 떴다 비행기", level: "입문", chords: ["C", "G"], pick: .bassStrum),
 
         // ── 초급 : 코드 3개 ─────────────────────────────────────────
-        PracticeSong(title: "반짝반짝 작은 별", level: "초급", chords: ["C", "F", "G"]),
-        PracticeSong(title: "학교종",          level: "초급", chords: ["C", "F", "C", "G"]),
-        PracticeSong(title: "산토끼",          level: "초급", chords: ["G", "C", "D"]),
+        PracticeSong(title: "반짝반짝 작은 별", level: "초급", chords: ["C", "F", "G"],      pick: .arpeggioUp),
+        PracticeSong(title: "학교종",          level: "초급", chords: ["C", "F", "C", "G"], pick: .bassStrum),
+        PracticeSong(title: "산토끼",          level: "초급", chords: ["G", "C", "D"],      pick: .bassStrum),
 
         // ── 중급 : 교본 단골 기타곡 ──────────────────────────────────
-        PracticeSong(title: "Amazing Grace",           level: "중급", chords: ["G", "C", "G", "D"]),
-        PracticeSong(title: "House of the Rising Sun", level: "중급", chords: ["Am", "C", "D", "F", "Am", "E"]),
+        PracticeSong(title: "Amazing Grace",           level: "중급", chords: ["G", "C", "G", "D"],           pick: .waltz),
+        PracticeSong(title: "House of the Rising Sun", level: "중급", chords: ["Am", "C", "D", "F", "Am", "E"], pick: .arpeggioUp),
     ]
 }
