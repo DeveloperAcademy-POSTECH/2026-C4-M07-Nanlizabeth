@@ -7,6 +7,9 @@ import SwiftUI
 ///
 /// - Note: **iPhone 전용 화면**이다. iPad는 왼손을 맡지 않으므로 `AppRoute.isAvailable(on:)`에서 제외된다.
 struct ChordDrillScreen: View {
+    /// 연습할 노래. 진입 시 이 노래의 코드 진행으로 드릴을 채운다.
+    let song: PracticeSong
+
     @EnvironmentObject private var router: AppRouter
     @StateObject private var controller = ChordDrillController()
 
@@ -25,6 +28,7 @@ struct ChordDrillScreen: View {
             hud
         }
         .onAppear {
+            controller.load(song.drill)   // 고른 노래의 진행으로 채운다
             controller.start()
             // 화면에 들어오면 자동 주법이 바로 돈다 (모드 A와 동일). 정답일 때만 소리가 난다.
             controller.play(pattern: StrumPatternLibrary().presets.first ?? .fallback, bpm: 80)
@@ -62,6 +66,9 @@ struct ChordDrillScreen: View {
 
     private var targetLabel: some View {
         VStack(spacing: 2) {
+            Text(song.title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.gsTextPrimary)
             Text("이 코드를 짚어보세요")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.gsTextSecondary)
@@ -109,7 +116,7 @@ struct ChordDrillScreen: View {
 
 #Preview("코드 드릴") {
     PortraitLockedLandscapeStage {
-        ChordDrillScreen()
+        ChordDrillScreen(song: PracticeSongData.songs[0])
             .environmentObject(AppRouter(deviceType: .iPhone))
     }
 }

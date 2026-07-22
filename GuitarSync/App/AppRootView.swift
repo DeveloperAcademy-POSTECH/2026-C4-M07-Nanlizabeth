@@ -24,6 +24,9 @@ struct AppRootView: View {
     /// `Features/Shared/` 폴더 전체가 사라진다.
     @StateObject private var prototypeViewModel = ScreenshotPrototypeViewModel()
 
+    /// 코드 드릴에서 고른 연습곡. 노래 선택 화면 → 드릴 화면으로 넘겨준다.
+    @State private var selectedDrillSong: PracticeSong?
+
     /// iPad **스트럼**만 Figma iPad 4:3 도화지(1366×1024)를 쓴다 — 배경 이미지가 화면을 꽉 채우도록.
     /// 나머지 화면·기기는 기존 iPhone 도화지(874×402) 그대로. (iPad 다른 화면들의 4:3 재배치는 이후 작업)
     private var stageReference: CGSize {
@@ -103,12 +106,22 @@ struct AppRootView: View {
                     prototypeViewModel.showBPM = false
                     router.replaceRoot(with: mode == .chord ? .neck : .strum)
                 },
-                // 넥(모드 A)에서 코드 드릴 연습으로 진입.
-                onStartDrill: { router.navigate(to: .chordDrill) }
+                // 넥(모드 A)에서 코드 드릴 연습으로 진입 — 먼저 노래를 고른다.
+                onStartDrill: { router.navigate(to: .chordDrillSongSelect) }
+            )
+
+        case .chordDrillSongSelect:
+            ChordDrillSongSelectScreen(
+                songs: PracticeSongData.songs,
+                onBack: router.back,
+                onSelect: { song in
+                    selectedDrillSong = song
+                    router.navigate(to: .chordDrill)
+                }
             )
 
         case .chordDrill:
-            ChordDrillScreen()
+            ChordDrillScreen(song: selectedDrillSong ?? PracticeSongData.songs[0])
 
         case .strokeSelect:
             StrumSelectScreen(

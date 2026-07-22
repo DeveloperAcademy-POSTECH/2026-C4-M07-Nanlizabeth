@@ -24,7 +24,7 @@ final class ChordDrillController: ObservableObject {
     @Published private(set) var currentChord: GuitarChord
     /// 진행 위치 (0-based)와 전체 개수 — 진행 표시 점에 쓴다.
     @Published private(set) var position: Int
-    let total: Int
+    @Published private(set) var total: Int
     /// 방금 맞혔다는 신호. 값이 바뀔 때마다 정답 → 화면이 플래시에 쓴다.
     @Published private(set) var correctFlash: Int = 0
 
@@ -64,6 +64,17 @@ final class ChordDrillController: ObservableObject {
         cancellable = session.fingeringState.fingeringChanged.sink { [weak self] fingering in
             self?.scheduleJudgement(for: fingering)
         }
+    }
+
+    /// 다른 노래로 갈아끼운다. 화면 진입 시 고른 노래의 진행을 넣는다.
+    func load(_ newDrill: ChordDrill) {
+        settleTask?.cancel()
+        drill = newDrill
+        session.target = newDrill.current
+        currentChord = newDrill.current
+        position = newDrill.position
+        total = newDrill.total
+        lastAdvancedFingering = nil
     }
 
     // MARK: - 화면 수명주기

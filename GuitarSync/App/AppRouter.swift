@@ -7,7 +7,9 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
     case onboarding
     /// 2. 기타넥 — 코드 짚기 (iPhone 메인)
     case neck
-    /// 2-1. 코드 드릴 — 정답 코드일 때만 소리 나는 왼손 코드 전환 연습 (iPhone 전용, docs/PLAN-chord-drill)
+    /// 2-1. 코드 드릴 노래 선택 — 연습할 곡 고르기 (iPhone 전용, docs/PLAN-chord-drill)
+    case chordDrillSongSelect
+    /// 2-2. 코드 드릴 — 정답 코드일 때만 소리 나는 왼손 코드 전환 연습 (iPhone 전용, docs/PLAN-chord-drill)
     case chordDrill
     /// 3. 스트럼 — 줄 긁기 (iPad 메인 / iPhone 모드 B)
     case strum
@@ -31,6 +33,7 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
         switch self {
         case .onboarding: return "시작하기"
         case .neck: return "기타넥"
+        case .chordDrillSongSelect: return "노래 선택"
         case .chordDrill: return "코드 드릴"
         case .strum: return "스트럼"
         case .strokeSelect: return "스트로크 선택"
@@ -56,7 +59,7 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
     func isAvailable(on deviceType: DeviceType) -> Bool {
         guard deviceType == .iPad else { return true }
         switch self {
-        case .neck, .chordDrill, .strokeSelect: return false
+        case .neck, .chordDrillSongSelect, .chordDrill, .strokeSelect: return false
         default: return true
         }
     }
