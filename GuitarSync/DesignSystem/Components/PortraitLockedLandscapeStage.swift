@@ -11,6 +11,24 @@ extension EnvironmentValues {
     }
 }
 
+private struct StageSafeAreaHorizontalPadding: ViewModifier {
+    @Environment(\.landscapeStageSafeAreaInsets) private var stageSafeArea
+    let minimum: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.leading, max(minimum, stageSafeArea.leading))
+            .padding(.trailing, max(minimum, stageSafeArea.trailing))
+    }
+}
+
+extension View {
+    /// 배경은 화면 끝까지 유지하고 조작 UI만 스테이지의 좌우 안전영역 안에 둔다.
+    func stageSafeAreaHorizontalPadding(minimum: CGFloat = 0) -> some View {
+        modifier(StageSafeAreaHorizontalPadding(minimum: minimum))
+    }
+}
+
 /// 콘텐츠를 가로 도화지 하나에 그리게 해주는 스테이지 (ARCHITECTURE §2.5 / 태스크 F1).
 ///
 /// **기기에 따라 가로를 만드는 방식이 다르다:**
@@ -69,14 +87,17 @@ struct PortraitLockedLandscapeStage<Content: View>: View {
     private func rotatedStage(in proxy: GeometryProxy) -> some View {
         let stageSize = CGSize(width: proxy.size.height, height: proxy.size.width)
         let scale = LayoutTokens.scale(reference: reference, in: stageSize)
+        let portraitVerticalSafeArea: CGFloat = 60
 
         // 세이프에어리어도 회전에 맞춰 한 칸씩 돌리고, 콘텐츠가 기준 좌표계에 있으므로
         // 배율로 나눠 같은 물리 거리를 가리키게 한다.
         let stageSafeArea = EdgeInsets(
             top: proxy.safeAreaInsets.leading / scale,
-            leading: proxy.safeAreaInsets.bottom / scale,
+            // 세로 기준 아래 → 회전된 가로 UI의 왼쪽. 최소 60pt를 확보한다.
+            leading: max(proxy.safeAreaInsets.bottom / scale, portraitVerticalSafeArea),
             bottom: proxy.safeAreaInsets.trailing / scale,
-            trailing: proxy.safeAreaInsets.top / scale
+            // 세로 기준 위 → 회전된 가로 UI의 오른쪽. 최소 60pt를 확보한다.
+            trailing: max(proxy.safeAreaInsets.top / scale, portraitVerticalSafeArea)
         )
 
         content

@@ -51,7 +51,7 @@ struct ChordDrillScreen: View {
             flashLabel
         }
         .padding(.top, 14)
-        .padding(.horizontal, 16)
+        .stageSafeAreaHorizontalPadding(minimum: 16)
     }
 
     private var backButton: some View {

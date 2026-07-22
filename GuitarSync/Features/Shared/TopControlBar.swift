@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// 연주 화면을 덮는 UIKit 멀티터치 레이어에서 제외할 실제 컨트롤 영역.
+/// TopControlBar의 기존 위치·크기(상단 20, 우측 60, 최대 너비 690)를 그대로 반영한다.
+enum InstrumentControlHitRegion {
+    static let topBar = CGRect(x: 116, y: 12, width: 706, height: 62)
+}
+
 struct TopControlBar: View {
     let mode: PrototypeMode
     let isPlaying: Bool
@@ -65,20 +71,9 @@ private struct SegmentedModeControl: View {
 
     var body: some View {
         ZStack {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay(Capsule().fill(Color.black.opacity(0.38)))
-                .overlay(
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.20), Color.white.opacity(0.03)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                )
-                .overlay(Capsule().stroke(Color.white.opacity(0.20), lineWidth: 1))
+            Color.clear
+                .glassEffect(.regular, in: .capsule)
+                .allowsHitTesting(false)
 
             HStack(spacing: 0) {
                 segment("코드", isSelected: mode == .chord) {
@@ -97,15 +92,16 @@ private struct SegmentedModeControl: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? Color.white.opacity(0.12) : Color.clear)
-                        .background(
-                            Capsule()
-                                .fill(isSelected ? .ultraThinMaterial : .regularMaterial)
-                                .opacity(isSelected ? 1 : 0)
-                        )
-                )
+                .background {
+                    if isSelected {
+                        Color.clear
+                            .glassEffect(
+                                .regular.tint(Color.white.opacity(0.12)),
+                                in: .capsule
+                            )
+                            .allowsHitTesting(false)
+                    }
+                }
         }
         .buttonStyle(.plain)
     }

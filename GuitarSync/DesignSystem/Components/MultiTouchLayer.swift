@@ -43,6 +43,8 @@ struct TouchSample: Equatable {
 /// }
 /// ```
 struct MultiTouchLayer: UIViewRepresentable {
+    /// 이 영역은 UIKit 멀티터치 뷰가 받지 않고 뒤의 SwiftUI 버튼으로 통과시킨다.
+    var excludedHitRegions: [CGRect] = []
     /// 접촉 반지름까지 담은 상세 스냅샷. **바레를 쓰려면 이걸 받는다** (넥 화면).
     var onSamplesChanged: (([TouchID: TouchSample]) -> Void)? = nil
     /// 위치만 담은 간단 스냅샷. 반지름이 필요 없는 화면(스트럼)이 쓴다. 트레일링 클로저가 여기로 묶인다.
@@ -50,12 +52,14 @@ struct MultiTouchLayer: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MultiTouchView {
         let view = MultiTouchView()
+        view.excludedHitRegions = excludedHitRegions
         view.onSamplesChanged = onSamplesChanged
         view.onTouchesChanged = onTouchesChanged
         return view
     }
 
     func updateUIView(_ uiView: MultiTouchView, context: Context) {
+        uiView.excludedHitRegions = excludedHitRegions
         uiView.onSamplesChanged = onSamplesChanged
         uiView.onTouchesChanged = onTouchesChanged
     }
@@ -63,6 +67,7 @@ struct MultiTouchLayer: UIViewRepresentable {
 
 /// 실제 터치를 받는 UIKit 뷰. 좌표의 **의미 해석은 하지 않는다** — 그건 쓰는 쪽 몫이다.
 final class MultiTouchView: UIView {
+    var excludedHitRegions: [CGRect] = []
     var onSamplesChanged: (([TouchID: TouchSample]) -> Void)?
     var onTouchesChanged: (([TouchID: CGPoint]) -> Void)?
 
@@ -77,6 +82,11 @@ final class MultiTouchView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("코드로만 만든다 — 스토리보드를 쓰지 않는 프로젝트다.")
+    }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        guard !excludedHitRegions.contains(where: { $0.contains(point) }) else { return false }
+        return super.point(inside: point, with: event)
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {

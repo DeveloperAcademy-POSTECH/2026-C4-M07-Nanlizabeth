@@ -27,21 +27,26 @@ struct NeckScreen: View {
 
     var body: some View {
         ZStack {
-            board
-            fretBars
-            inlays
+            Image("iPhoneNeckBackground")
+                .resizable()
+                .scaledToFill()
+                .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
+                .clipped()
             strings
             targetMarkers
             pressMarkers
 
             // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
             // 지판 밖 터치는 `NeckGeometry.presses(at:majorRadius:)`가 걸러낸다.
-            MultiTouchLayer(onSamplesChanged: { samples in
-                let presses = samples.values.flatMap {
-                    NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)
+            MultiTouchLayer(
+                excludedHitRegions: [InstrumentControlHitRegion.topBar],
+                onSamplesChanged: { samples in
+                    let presses = samples.values.flatMap {
+                        NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)
+                    }
+                    viewModel.pressesChanged(Set(presses))
                 }
-                viewModel.pressesChanged(Set(presses))
-            })
+            )
         }
         .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
         .onChange(of: viewModel.fingering) { _, fingering in
@@ -55,55 +60,9 @@ struct NeckScreen: View {
 
     // MARK: - 자주 쓰는 치수
 
-    private var boardHeight: CGFloat { NeckGeometry.boardBottom - NeckGeometry.boardTop }
-    private var boardCenterY: CGFloat { (NeckGeometry.boardTop + NeckGeometry.boardBottom) / 2 }
     private var stageCenterX: CGFloat { NeckGeometry.stage.width / 2 }
 
     // MARK: - 레이어
-
-    /// 지판. 위아래 가장자리를 어둡게 해 원통형 곡면을 흉내낸다.
-    private var board: some View {
-        LinearGradient(
-            colors: [
-                Color.gsSeparator,
-                Color.gsNeckSurface,
-                Color.gsNeckSurface,
-                Color.gsSeparator,
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(width: NeckGeometry.stage.width, height: boardHeight)
-        .position(x: stageCenterX, y: boardCenterY)
-    }
-
-    /// 프렛 막대. **첫 번째가 너트**라 더 굵고 밝다.
-    private var fretBars: some View {
-        ForEach(Array(NeckGeometry.fretBoundaryXs.enumerated()), id: \.offset) { index, x in
-            let isNut = index == 0
-
-            Rectangle()
-                .fill(metalFill(isNut: isNut))
-                .frame(
-                    width: isNut ? NeckGeometry.nutWidth : NeckGeometry.fretWidth,
-                    height: boardHeight
-                )
-                .position(x: x, y: boardCenterY)
-        }
-    }
-
-    /// 포지션 마크. 실제 기타처럼 3·5프렛 한가운데 높이에 찍힌다.
-    private var inlays: some View {
-        ForEach(NeckGeometry.inlayFrets, id: \.self) { fret in
-            if let x = NeckGeometry.fretCenterX(fret) {
-                Circle()
-                    .fill(Color.gsTextPrimary)
-                    .frame(width: NeckGeometry.inlayDiameter, height: NeckGeometry.inlayDiameter)
-                    .overlay(Circle().stroke(Color.gsHardware, lineWidth: 2))
-                    .position(x: x, y: NeckGeometry.boardCenterY)
-            }
-        }
-    }
 
     /// 6줄. 위가 저음(굵음), 아래가 고음(얇음).
     private var strings: some View {
@@ -206,18 +165,6 @@ struct NeckScreen: View {
         return result
     }
 
-    /// 금속 막대 느낌 — 가운데가 밝고 양옆이 어둡다.
-    private func metalFill(isNut: Bool) -> LinearGradient {
-        LinearGradient(
-            colors: [
-                Color.gsHardware,
-                Color.gsTextPrimary.opacity(isNut ? 1 : 0.82),
-                Color.gsHardware,
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
 }
 
 #Preview("기타넥 — Mock (아무 데나 눌러도 Am)") {

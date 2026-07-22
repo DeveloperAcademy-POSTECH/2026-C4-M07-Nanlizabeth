@@ -7,7 +7,7 @@ struct BPMPopover: View {
         HStack(spacing: 8) {
             Slider(value: $bpm, in: 40...240)
                 .tint(Color.white.opacity(0.88))
-                .frame(width: 215)
+                .frame(width: 280)
 
             Text("\(Int(bpm.rounded()))")
                 .monospacedDigit()
@@ -16,7 +16,7 @@ struct BPMPopover: View {
         .font(.system(size: 13, weight: .semibold))
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
-        .frame(width: 300, height: 34)
+        .frame(width: 365, height: 44)
         .background(
             RoundedRectangle(cornerRadius: 17)
                 .fill(Color(red: 0.30, green: 0.34, blue: 0.42).opacity(0.95))

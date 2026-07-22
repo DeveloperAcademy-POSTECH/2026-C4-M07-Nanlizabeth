@@ -24,7 +24,7 @@ struct ChordDrillSongSelectScreen: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, Spacing.xl)
+                .stageSafeAreaHorizontalPadding(minimum: Spacing.xl)
                 .padding(.top, Spacing.xs)
                 .padding(.bottom, Spacing.lg)
             }

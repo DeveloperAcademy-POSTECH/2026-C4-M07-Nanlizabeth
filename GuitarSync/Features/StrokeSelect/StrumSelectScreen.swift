@@ -9,6 +9,8 @@ import SwiftUI
 ///   사용자가 직접 만드는 건 코드진행뿐입니다.
 /// - Note: 이 화면은 **iPhone 전용**입니다. iPad는 항상 직접 긁으므로 자동 주법을 고를 일이 없습니다.
 struct StrumSelectScreen: View {
+    @Environment(\.landscapeStageSafeAreaInsets) private var stageSafeArea
+
     @ObservedObject var viewModel: StrumSelectViewModel
     let onBack: () -> Void
     let onConfirm: () -> Void
@@ -57,7 +59,8 @@ struct StrumSelectScreen: View {
 
             Spacer()
         }
-        .padding(.horizontal, Spacing.xl)
+        .padding(.leading, max(Spacing.xl, stageSafeArea.leading))
+        .padding(.trailing, max(Spacing.xl, stageSafeArea.trailing))
     }
 
     /// 주법 카드 2열 격자.
@@ -76,7 +79,8 @@ struct StrumSelectScreen: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, Spacing.xl)
+            .padding(.leading, max(Spacing.xl, stageSafeArea.leading))
+            .padding(.trailing, max(Spacing.xl, stageSafeArea.trailing))
             .padding(.top, Spacing.xs)
             .padding(.bottom, Spacing.lg)
         }
