@@ -38,4 +38,12 @@ enum HapticsManager {
     static func wrongChord() {
         UINotificationFeedbackGenerator().notificationOccurred(.error)
     }
+
+    /// 목표 코드를 정확히 짚었을 때의 "맞았어" 진동. (docs/PLAN-chord-drill §4-6)
+    ///
+    /// 오답(`wrongChord`)과 반대로 **성공 알림 패턴**을 써서, 코드 드릴에서 정답으로
+    /// 넘어가는 순간을 손끝으로 확인시켜 준다.
+    static func correctChord() {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
 }

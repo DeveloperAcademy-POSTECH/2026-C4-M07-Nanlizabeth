@@ -25,6 +25,9 @@ struct MainInstrumentScreen: View {
     /// 코드/스트로크 모드를 바꿀 때. **라우터 route까지 바꾼다** — 안 그러면 뒤로가기가 넥으로 샌다.
     var onModeChange: (PrototypeMode) -> Void = { _ in }
 
+    /// 코드 드릴 연습으로 진입할 때 (넥 화면에서만 노출). AppRootView가 라우팅한다.
+    var onStartDrill: () -> Void = {}
+
     /// 이 기기. iPad는 모드 토글을 숨기고 항상 스트로크만 한다.
     var deviceType: DeviceType = DeviceInfoProvider.currentDeviceType
 
@@ -59,6 +62,20 @@ struct MainInstrumentScreen: View {
                 BPMPopover(bpm: $viewModel.bpm)
                     .padding(.top, 88)
                     .padding(.trailing, 162)
+            }
+
+            // 넥(모드 A, iPhone)에서만 — 코드 드릴 연습 진입 버튼.
+            if viewModel.mode == .chord && !isPad {
+                Button(action: onStartDrill) {
+                    Label("코드 드릴", systemImage: "target")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.gsOnAccent)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(Color.gsAccent))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 20)
             }
 
             #if DEBUG

@@ -7,6 +7,8 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
     case onboarding
     /// 2. 기타넥 — 코드 짚기 (iPhone 메인)
     case neck
+    /// 2-1. 코드 드릴 — 정답 코드일 때만 소리 나는 왼손 코드 전환 연습 (iPhone 전용, docs/PLAN-chord-drill)
+    case chordDrill
     /// 3. 스트럼 — 줄 긁기 (iPad 메인 / iPhone 모드 B)
     case strum
     /// 4. 스트로크 선택 — 프리셋 주법 목록
@@ -29,6 +31,7 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
         switch self {
         case .onboarding: return "시작하기"
         case .neck: return "기타넥"
+        case .chordDrill: return "코드 드릴"
         case .strum: return "스트럼"
         case .strokeSelect: return "스트로크 선택"
         case .progressionSelect: return "코드진행 선택"
@@ -40,7 +43,7 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
 
     /// 연주 화면인가 — 진입 시 **화면 꺼짐 방지**를 켜야 하는 화면 (ARCHITECTURE §3.10).
     var isPerformanceScreen: Bool {
-        self == .neck || self == .strum
+        self == .neck || self == .strum || self == .chordDrill
     }
 
     /// 이 화면이 해당 기기에 존재하는가.
@@ -53,7 +56,7 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
     func isAvailable(on deviceType: DeviceType) -> Bool {
         guard deviceType == .iPad else { return true }
         switch self {
-        case .neck, .strokeSelect: return false
+        case .neck, .chordDrill, .strokeSelect: return false
         default: return true
         }
     }

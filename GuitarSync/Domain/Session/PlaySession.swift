@@ -108,6 +108,13 @@ final class PlaySessionCoordinator: ObservableObject {
     /// 실제로 소리가 난 사건 — 줄 애니메이션(U3)과 햅틱(H1)이 구독한다.
     var notePlayed: AnyPublisher<NotePlayedEvent, Never> { notePlayedSubject.eraseToAnyPublisher() }
 
+    /// **소리 게이트** — 지금 운지가 이 조건을 통과할 때만 소리를 낸다. (docs/PLAN-chord-drill §4-1)
+    ///
+    /// `nil`이면 항상 통과한다 — 기존 모드(A·B·C)는 이 값을 건드리지 않으므로 **동작이 그대로다.**
+    /// 코드 드릴이 "정답 코드일 때만 소리"를 여기에 건다: 목표와 다른 운지면 획이 긁혀도 무음이고,
+    /// 줄 떨림·햅틱(`notePlayed`)도 나가지 않는다.
+    var soundGate: ((GuitarFingering) -> Bool)?
+
     private let notePlayedSubject = PassthroughSubject<NotePlayedEvent, Never>()
     private let audioEngine: GuitarAudioEngineProtocol?
 
@@ -156,6 +163,8 @@ final class PlaySessionCoordinator: ObservableObject {
     private func handleStrum(_ occurrence: StrumOccurrence) {
         // ★ 여기가 핵심 — "긁은 그 순간"의 운지를 읽는다.
         let fingering = fingeringSource?.currentFingering ?? .open
+        // 게이트가 닫혀 있으면 이 획은 통째로 무음 — 소리도, 줄 떨림·햅틱 방송도 없다.
+        guard soundGate?(fingering) ?? true else { return }
         lastPlayedFingering = fingering
 
         audioEngine?.strum(
@@ -184,6 +193,7 @@ final class PlaySessionCoordinator: ObservableObject {
 
     private func handlePluck(_ occurrence: PluckOccurrence) {
         let fingering = fingeringSource?.currentFingering ?? .open
+        guard soundGate?(fingering) ?? true else { return }
         guard fingering.isAudible(stringIndex: occurrence.stringIndex),
               let fret = fingering.fret(for: occurrence.stringIndex)
         else { return }

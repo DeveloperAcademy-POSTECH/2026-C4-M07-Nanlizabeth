@@ -102,8 +102,13 @@ struct AppRootView: View {
                 onModeChange: { mode in
                     prototypeViewModel.showBPM = false
                     router.replaceRoot(with: mode == .chord ? .neck : .strum)
-                }
+                },
+                // 넥(모드 A)에서 코드 드릴 연습으로 진입.
+                onStartDrill: { router.navigate(to: .chordDrill) }
             )
+
+        case .chordDrill:
+            ChordDrillScreen()
 
         case .strokeSelect:
             StrumSelectScreen(
