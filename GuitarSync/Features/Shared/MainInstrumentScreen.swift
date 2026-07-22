@@ -46,6 +46,8 @@ struct MainInstrumentScreen: View {
                 showsModeToggle: !isPad,
                 // BPM은 **일시정지 중에만** 바꾼다 — 재생 중엔 잠근다.
                 bpmEnabled: !viewModel.isPlaying,
+                // 코드 모드에서만 연결 버튼 왼쪽에 드릴 진입 버튼이 뜬다 (TopControlBar가 모드로 거른다).
+                onStartDrill: isPad ? nil : onStartDrill,
                 onModeChange: onModeChange,
                 onPeer: onPeerConnect,
                 onAction: viewModel.openActionScreen,
@@ -62,20 +64,6 @@ struct MainInstrumentScreen: View {
                 BPMPopover(bpm: $viewModel.bpm)
                     .padding(.top, 88)
                     .padding(.trailing, 162)
-            }
-
-            // 넥(모드 A, iPhone)에서만 — 코드 드릴 연습 진입 버튼.
-            if viewModel.mode == .chord && !isPad {
-                Button(action: onStartDrill) {
-                    Label("코드 드릴", systemImage: "target")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.gsOnAccent)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(Capsule().fill(Color.gsAccent))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, 20)
             }
 
             #if DEBUG

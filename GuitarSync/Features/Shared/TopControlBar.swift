@@ -10,6 +10,8 @@ struct TopControlBar: View {
     var showsModeToggle: Bool = true
     /// BPM은 일시정지 중에만 바꿀 수 있다 — 재생 중이면 버튼을 흐리게·비활성화한다.
     var bpmEnabled: Bool = true
+    /// 코드 드릴 진입 (코드 모드에서만 노출). `nil`이면 버튼을 감춘다.
+    var onStartDrill: (() -> Void)? = nil
     let onModeChange: (PrototypeMode) -> Void
     let onPeer: () -> Void
     let onAction: () -> Void
@@ -21,6 +23,11 @@ struct TopControlBar: View {
         HStack(spacing: 12) {
             if isExpanded {
                 HStack(spacing: 12) {
+                    // 연결(멀티피어) 버튼 왼쪽 — 코드 모드에서만 코드 드릴 진입 버튼.
+                    if mode == .chord, let onStartDrill {
+                        LiquidGlassIconButton(systemName: "target", action: onStartDrill)
+                    }
+
                     PeerLiquidGlassButton(state: peerButtonState, action: onPeer)
 
                     if showsModeToggle {
