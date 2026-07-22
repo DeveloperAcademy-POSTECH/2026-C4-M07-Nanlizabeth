@@ -33,6 +33,12 @@ struct GuitarFingering: Equatable, Hashable, Codable {
     var isSilent: Bool {
         frets.allSatisfy { $0 < 0 }
     }
+
+    /// **가장 낮은(굵은) 울리는 줄** — 코드의 베이스. 전부 뮤트면 `nil`.
+    /// (인덱스 0 = 6번줄이 가장 낮은 음이므로 앞에서부터 찾는다.)
+    var lowestAudibleString: Int? {
+        frets.firstIndex { $0 >= 0 }
+    }
 }
 
 extension GuitarFingering {
@@ -53,5 +59,11 @@ extension GuitarChord {
     /// 특정 카탈로그를 지정해 조회하려면 `ChordCatalog.fingering(for:)`를 직접 쓴다.
     var fingering: GuitarFingering {
         ChordCatalog.shared.fingering(for: self) ?? .open
+    }
+
+    /// 이 코드를 짚는 손가락 번호(줄마다 하나). `0`=안 짚음 · `1`검지 · `2`중지 · `3`약지 · `4`새끼.
+    /// 데이터가 없으면 빈 배열. **실제 데이터는 `Content/ChordCatalogData.swift`에 있다.**
+    var fingers: [Int] {
+        ChordCatalog.shared.fingers(for: self)
     }
 }

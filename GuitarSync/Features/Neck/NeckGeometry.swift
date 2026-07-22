@@ -73,6 +73,28 @@ enum NeckGeometry {
         return FretPress(stringIndex: stringIndex, fret: fret)
     }
 
+    /// 접촉 반지름이 클수록 세로로 더 넓은 줄 범위를 덮는 정도. (바레 감도)
+    /// 값이 클수록 손가락을 살짝만 눕혀도 이웃 줄이 함께 잡힌다.
+    static let barreRadiusScale: CGFloat = 1.4
+
+    /// 터치 한 개(중심 + 접촉 반지름) → 짚은 칸들. **넓게 누르면(바레) 세로로 인접한 여러 줄**을
+    /// 같은 프렛으로 함께 짚은 것으로 본다. (docs/PLAN-chord-drill 개선 — 한 손가락 바레 입력)
+    ///
+    /// 접촉이 작으면(지문 하나) 가장 가까운 줄 하나만 — 기존 동작과 같다(회귀 없음).
+    static func presses(at point: CGPoint, majorRadius: CGFloat) -> [FretPress] {
+        guard point.y >= boardTop, point.y <= boardBottom, let fret = fret(atX: point.x) else {
+            return []
+        }
+
+        let halfBand = majorRadius * barreRadiusScale
+        var covered = stringYs.indices.filter { abs(stringYs[$0] - point.y) <= halfBand }
+        // 접촉이 작아 아무 줄도 안 걸리면, 가장 가까운 줄 하나로 친다.
+        if covered.isEmpty, let nearest = stringIndex(atY: point.y) {
+            covered = [nearest]
+        }
+        return covered.map { FretPress(stringIndex: $0, fret: fret) }
+    }
+
     /// 세로 위치 → 줄 번호.
     ///
     /// **줄 위를 정확히 짚을 필요는 없다.** 가장 가까운 줄로 쳐서 줄 사이 공간을 반씩 나눠 갖는다 —
@@ -133,5 +155,128 @@ enum NeckGeometry {
     /// 줄의 굵기. 저음줄일수록 굵다 — 실제 기타와 같다.
     static func stringThickness(_ stringIndex: Int) -> CGFloat {
         stringIndex < 3 ? 4 : 3
+    }
+
+    // MARK: - 짚은 자리 표식 (원 / 바레 타원)
+
+    /// 개방현(○)·뮤트(✕) 힌트를 찍는 가로 위치 — 너트 바로 오른쪽 바깥.
+    static let openMuteHintX: CGFloat = 858
+
+    /// 짚은 자리를 그릴 표식 하나. 한 프렛에서 **인접한 여러 줄**이면 타원(바레), 한 줄이면 원.
+    struct FingerMarker: Equatable, Identifiable {
+        let id: String
+        let center: CGPoint
+        let size: CGSize
+        /// 여러 줄에 걸친 바레(타원)인가. 아니면 원(가로세로 같음).
+        let isBarre: Bool
+        /// 손가락 번호(1~4). `0`이면 번호를 표시하지 않는다 (짚기 피드백 등).
+        var finger: Int = 0
+    }
+
+    /// 줄→프렛 매핑(프렛 1 이상만)을 원/바레 표식으로 바꾼다. (docs/PLAN-chord-drill 개선)
+    ///
+    /// - 같은 프렛에서 **연속된 줄**은 하나의 타원(바레)으로 묶는다 — F 코드처럼 손가락 하나로
+    ///   여러 줄을 누르는 모습.
+    /// - 한 줄만이면 원. (원은 폭·높이가 같은 캡슐이라 자연히 동그랗다.)
+    static func fingerMarkers(frettedByString: [Int: Int]) -> [FingerMarker] {
+        var byFret: [Int: [Int]] = [:]
+        for (stringIndex, fret) in frettedByString where fret >= 1 {
+            byFret[fret, default: []].append(stringIndex)
+        }
+
+        var markers: [FingerMarker] = []
+        for (fret, strings) in byFret {
+            guard let x = fretCenterX(fret) else { continue }
+            for run in contiguousRuns(strings.sorted()) {
+                guard stringYs.indices.contains(run.start), stringYs.indices.contains(run.end) else { continue }
+                let yTop = stringYs[run.start]
+                let yBottom = stringYs[run.end]
+                let isBarre = run.end > run.start
+                markers.append(
+                    FingerMarker(
+                        id: "\(fret)-\(run.start)-\(run.end)",
+                        center: CGPoint(x: x, y: (yTop + yBottom) / 2),
+                        size: CGSize(
+                            width: pressMarkerDiameter,
+                            height: isBarre ? (yBottom - yTop) + pressMarkerDiameter : pressMarkerDiameter
+                        ),
+                        isBarre: isBarre
+                    )
+                )
+            }
+        }
+        return markers
+    }
+
+    /// **코드 다이어그램용 표식** — 손가락 번호를 달아 "어느 줄을 몇 번 손가락으로" 안내한다.
+    /// (docs/PLAN-chord-drill 개선 — 운지 손가락 안내)
+    ///
+    /// - **바레(타원)**는 *같은 손가락*이 **연속된 3줄 이상**을 누를 때만 만든다.
+    ///   F처럼 검지가 6번줄과 1·2번줄에 떨어져 걸치면(가운데는 다른 손가락이 위에서 누름)
+    ///   연속 구간이 2줄 이하라 **원 여러 개**로 나뉘어, 각 줄을 또렷이 짚도록 안내한다.
+    /// - `frets`는 6개 운지(`-1`뮤트·`0`개방·`1~`프렛), `fingers`는 6개 손가락(`0`안짚음·`1~4`).
+    static func chordDiagramMarkers(frets: [Int], fingers: [Int]) -> [FingerMarker] {
+        struct Key: Hashable { let fret: Int; let finger: Int }
+
+        var byKey: [Key: [Int]] = [:]
+        for index in stringYs.indices where frets.indices.contains(index) && frets[index] >= 1 {
+            let finger = fingers.indices.contains(index) ? fingers[index] : 0
+            byKey[Key(fret: frets[index], finger: finger), default: []].append(index)
+        }
+
+        var markers: [FingerMarker] = []
+        for (key, strings) in byKey {
+            guard let x = fretCenterX(key.fret) else { continue }
+            for run in contiguousRuns(strings.sorted()) {
+                let spanned = run.end - run.start + 1
+                if spanned >= 3 {
+                    // 같은 손가락이 3줄 이상 → 바레 타원 하나.
+                    let yTop = stringYs[run.start]
+                    let yBottom = stringYs[run.end]
+                    markers.append(
+                        FingerMarker(
+                            id: "barre-\(key.fret)-\(key.finger)-\(run.start)",
+                            center: CGPoint(x: x, y: (yTop + yBottom) / 2),
+                            size: CGSize(width: pressMarkerDiameter, height: (yBottom - yTop) + pressMarkerDiameter),
+                            isBarre: true,
+                            finger: key.finger
+                        )
+                    )
+                } else {
+                    // 1~2줄 → 각 줄을 원으로 (F의 바깥 두 줄 등).
+                    for stringIndex in run.start...run.end {
+                        markers.append(
+                            FingerMarker(
+                                id: "dot-\(key.fret)-\(key.finger)-\(stringIndex)",
+                                center: CGPoint(x: x, y: stringYs[stringIndex]),
+                                size: CGSize(width: pressMarkerDiameter, height: pressMarkerDiameter),
+                                isBarre: false,
+                                finger: key.finger
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        return markers
+    }
+
+    /// 정렬된 정수 목록을 **연속 구간**들로 나눈다. 예: `[0,1,2,4,5]` → `[(0,2),(4,5)]`.
+    static func contiguousRuns(_ sorted: [Int]) -> [(start: Int, end: Int)] {
+        guard let first = sorted.first else { return [] }
+        var runs: [(start: Int, end: Int)] = []
+        var start = first
+        var prev = first
+        for value in sorted.dropFirst() {
+            if value == prev + 1 {
+                prev = value
+            } else {
+                runs.append((start, prev))
+                start = value
+                prev = value
+            }
+        }
+        runs.append((start, prev))
+        return runs
     }
 }

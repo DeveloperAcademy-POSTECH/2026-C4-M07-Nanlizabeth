@@ -25,6 +25,9 @@ struct MainInstrumentScreen: View {
     /// 코드/스트로크 모드를 바꿀 때. **라우터 route까지 바꾼다** — 안 그러면 뒤로가기가 넥으로 샌다.
     var onModeChange: (PrototypeMode) -> Void = { _ in }
 
+    /// 코드 드릴 연습으로 진입할 때 (넥 화면에서만 노출). AppRootView가 라우팅한다.
+    var onStartDrill: () -> Void = {}
+
     /// 이 기기. iPad는 모드 토글을 숨기고 항상 스트로크만 한다.
     var deviceType: DeviceType = DeviceInfoProvider.currentDeviceType
 
@@ -43,6 +46,8 @@ struct MainInstrumentScreen: View {
                 showsModeToggle: !isPad,
                 // BPM은 **일시정지 중에만** 바꾼다 — 재생 중엔 잠근다.
                 bpmEnabled: !viewModel.isPlaying,
+                // 코드 모드에서만 연결 버튼 왼쪽에 드릴 진입 버튼이 뜬다 (TopControlBar가 모드로 거른다).
+                onStartDrill: isPad ? nil : onStartDrill,
                 onModeChange: onModeChange,
                 onPeer: onPeerConnect,
                 onAction: viewModel.openActionScreen,

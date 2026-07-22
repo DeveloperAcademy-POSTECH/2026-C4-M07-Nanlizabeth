@@ -18,19 +18,30 @@ struct NeckScreen: View {
     /// 운지가 바뀔 때 알려준다. 모드 C에서 iPad로 보내는 데 쓴다 (본격 연결은 N1).
     var onFingeringChanged: ((GuitarFingering) -> Void)?
 
+    /// **짚어야 할 목표 코드.** 있으면 넥 위에 라임 고스트로 "여기를 짚어라"를 표시한다.
+    /// (코드 드릴이 넣는다. 자유연주 모드 A는 `nil` — 오버레이 없음.)
+    var targetFingering: GuitarFingering? = nil
+
+    /// 목표 코드의 손가락 번호(줄마다 하나). 있으면 고스트 위에 번호를 함께 안내한다.
+    var targetFingers: [Int] = []
+
     var body: some View {
         ZStack {
             board
             fretBars
             inlays
             strings
+            targetMarkers
             pressMarkers
 
-            // 맨 위에 깔아 손가락을 전부 받는다. 지판 밖 터치는 `NeckGeometry.press(at:)`가 걸러낸다.
-            // 좌표를 "몇 번 줄 몇 프렛"으로 바꾸는 건 여기서 하고, 레이어는 손가락만 세어 준다.
-            MultiTouchLayer { touches in
-                viewModel.pressesChanged(Set(touches.values.compactMap(NeckGeometry.press(at:))))
-            }
+            // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
+            // 지판 밖 터치는 `NeckGeometry.presses(at:majorRadius:)`가 걸러낸다.
+            MultiTouchLayer(onSamplesChanged: { samples in
+                let presses = samples.values.flatMap {
+                    NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)
+                }
+                viewModel.pressesChanged(Set(presses))
+            })
         }
         .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
         .onChange(of: viewModel.fingering) { _, fingering in
@@ -112,21 +123,87 @@ struct NeckScreen: View {
         .animation(.easeOut(duration: 0.16), value: viewModel.stringIntensity)
     }
 
-    /// 지금 짚고 있는 자리. 손끝에 가리지 않도록 칸 한가운데에 크게 찍는다.
+    /// 지금 짚고 있는 자리. **줄마다 사운드홀에 가까운 프렛(가장 높은 번호) 하나만** 표시한다 —
+    /// 실제 기타에서 한 줄에 여러 곳을 눌러도 몸통에 가까운 쪽만 소리 나는 것과 같다.
+    /// 같은 프렛에서 인접한 여러 줄을 짚으면 원이 아니라 **타원(바레)**으로 묶어 보여준다.
     private var pressMarkers: some View {
-        ForEach(viewModel.activePresses.sorted(), id: \.self) { press in
-            if let center = NeckGeometry.center(stringIndex: press.stringIndex, fret: press.fret) {
-                Circle()
-                    .fill(Color.gsAccent)
-                    .frame(
-                        width: NeckGeometry.pressMarkerDiameter,
-                        height: NeckGeometry.pressMarkerDiameter
-                    )
-                    .overlay(Circle().stroke(Color.gsOnAccent.opacity(0.4), lineWidth: 2))
-                    .position(center)
+        ForEach(NeckGeometry.fingerMarkers(frettedByString: pressedFretted)) { marker in
+            Capsule()
+                .fill(Color.gsAccent)
+                .overlay(Capsule().stroke(Color.gsOnAccent.opacity(0.4), lineWidth: 2))
+                .frame(width: marker.size.width, height: marker.size.height)
+                .position(marker.center)
+        }
+        .animation(.easeOut(duration: 0.12), value: pressedFretted)
+    }
+
+    /// 짚어야 할 목표 코드 오버레이 — 라임 고스트(테두리). 짚어야 할 프렛은 원/바레로,
+    /// 개방현은 ○, 뮤트는 ✕로 너트 바깥에 힌트를 준다.
+    @ViewBuilder
+    private var targetMarkers: some View {
+        if let target = targetFingering {
+            ForEach(NeckGeometry.chordDiagramMarkers(frets: target.frets, fingers: targetFingers)) { marker in
+                Capsule()
+                    .fill(Color.gsAccent.opacity(0.16))
+                    .overlay(Capsule().stroke(Color.gsAccent, lineWidth: 2.5))
+                    .frame(width: marker.size.width, height: marker.size.height)
+                    .overlay(fingerLabel(marker))
+                    .position(marker.center)
+            }
+            ForEach(Array(target.frets.enumerated()), id: \.offset) { index, fret in
+                openMuteHint(stringIndex: index, fret: fret)
             }
         }
-        .animation(.easeOut(duration: 0.12), value: viewModel.activePresses)
+    }
+
+    /// 표식 안에 그릴 손가락 번호. `0`이면 아무것도 안 그린다.
+    ///
+    /// 숫자 **뒤에만 어두운 칩**(넥 색)을 깔아, 칩이 그 자리 줄을 가려서 안 짚은 상태에서도
+    /// 숫자가 또렷이 읽힌다. 칩은 어두운 색이라 짚었을 때의 라임 피드백과 겹치지 않는다.
+    /// 바레(타원)면 위쪽에 한 번만, 원이면 한가운데에 둔다.
+    @ViewBuilder
+    private func fingerLabel(_ marker: NeckGeometry.FingerMarker) -> some View {
+        if marker.finger > 0 {
+            ZStack {
+                Circle()
+                    .fill(Color.gsNeckSurface)
+                    .overlay(Circle().stroke(Color.gsAccent.opacity(0.5), lineWidth: 1))
+                    .frame(width: 22, height: 22)
+                Text("\(marker.finger)")
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.gsAccent)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: marker.isBarre ? .top : .center)
+            .padding(.top, marker.isBarre ? 5 : 0)
+        }
+    }
+
+    /// 개방현(○)·뮤트(✕) 힌트 하나. 프렛을 짚는 줄은 표시하지 않는다.
+    @ViewBuilder
+    private func openMuteHint(stringIndex: Int, fret: Int) -> some View {
+        if NeckGeometry.stringYs.indices.contains(stringIndex) {
+            let y = NeckGeometry.stringYs[stringIndex]
+            if fret == 0 {
+                Circle()
+                    .stroke(Color.gsAccent, lineWidth: 2)
+                    .frame(width: 15, height: 15)
+                    .position(x: NeckGeometry.openMuteHintX, y: y)
+            } else if fret < 0 {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.gsTextSecondary)
+                    .position(x: NeckGeometry.openMuteHintX, y: y)
+            }
+        }
+    }
+
+    /// 지금 짚은 것 중 **줄마다 가장 높은 프렛**만 남긴다 (프렛 1 이상). 소리 규칙과 같은 기준.
+    private var pressedFretted: [Int: Int] {
+        var result: [Int: Int] = [:]
+        for press in viewModel.activePresses where press.fret >= 1 {
+            result[press.stringIndex] = max(result[press.stringIndex] ?? 0, press.fret)
+        }
+        return result
     }
 
     /// 금속 막대 느낌 — 가운데가 밝고 양옆이 어둡다.
