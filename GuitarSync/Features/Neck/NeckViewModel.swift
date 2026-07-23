@@ -13,8 +13,12 @@ final class NeckViewModel: ObservableObject {
     /// 지금 짚힌 운지. 화면 표시용이자, 나중에 멀티피어 전송이 그대로 쓸 값이다.
     @Published private(set) var fingering: GuitarFingering = .open
 
-    /// 지금 손가락이 닿아 있는 칸. 짚은 자리 점을 그리는 데 쓴다.
+    /// 지금 손가락이 닿아 있는 칸. **화면 좌표(1~5프렛) 그대로** — 짚은 자리 점을 그리는 데 쓴다.
     @Published private(set) var activePresses: Set<FretPress> = []
+
+    /// 넥 **포지션 오프셋** — 화면 첫 프렛 칸이 실제 몇 프렛인지. `0`이면 1프렛부터(기존).
+    /// 커지면 사운드홀 쪽 높은 프렛을 짚는다. 화면 점은 그대로, **소리는 오프셋 더한 프렛**으로 난다.
+    @Published private(set) var fretOffset: Int = 0
 
     /// 방금 울린 줄의 **세기(0~1)**. 줄이 얼마나 세게 떨리고 빛나는지에 그대로 쓴다.
     /// 값이 있으면 떨리는 중, 사라지면 잦아든 것.
@@ -79,10 +83,29 @@ final class NeckViewModel: ObservableObject {
 
     // MARK: - 입력
 
-    /// 터치 레이어가 부른다. **지금 눌려 있는 칸 전부**를 통째로 받는다.
+    /// 터치 레이어가 부른다. **지금 눌려 있는 칸 전부**를 화면 좌표(1~5프렛)로 받는다.
+    /// 화면 점은 받은 그대로 두고, 소리·운지는 **포지션 오프셋을 더한 실제 프렛**으로 넘긴다.
     func pressesChanged(_ presses: Set<FretPress>) {
         activePresses = presses
-        fingeringState.pressesChanged(presses)
+        fingeringState.pressesChanged(shifted(presses))
+    }
+
+    /// 넥 포지션을 옮긴다. 짚고 있는 채로 바뀌면 새 프렛으로 다시 반영해 소리가 따라오게 한다.
+    func setFretOffset(_ offset: Int) {
+        let clamped = max(0, offset)
+        guard clamped != fretOffset else { return }
+        fretOffset = clamped
+        fingeringState.pressesChanged(shifted(activePresses))
+    }
+
+    /// 화면 좌표 프렛에 포지션 오프셋을 더해 실제 프렛으로 바꾼다 (프렛 1 이상만).
+    private func shifted(_ presses: Set<FretPress>) -> Set<FretPress> {
+        guard fretOffset != 0 else { return presses }
+        return Set(presses.map { press in
+            press.fret >= 1
+                ? FretPress(stringIndex: press.stringIndex, fret: press.fret + fretOffset)
+                : press
+        })
     }
 
     /// 화면을 벗어나는 등, 손을 다 뗀 것으로 쳐야 할 때.
