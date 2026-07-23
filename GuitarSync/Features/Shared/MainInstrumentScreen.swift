@@ -35,6 +35,10 @@ struct MainInstrumentScreen: View {
 
     private var isPad: Bool { deviceType == .iPad }
 
+    /// 넥 포지션 컨트롤(슬라이더+A/B)이 놓이는 자리. **가장 낮은 줄(y=372)보다 아래**에 둬서
+    /// 프렛 짚기와 안 겹친다. 이 영역은 넥 터치에서 제외된다.
+    static let neckPositionBarRegion = CGRect(x: 137, y: 373, width: 600, height: 27)
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             instrument
@@ -142,9 +146,20 @@ struct MainInstrumentScreen: View {
             // 연결되면 자동 스트럼을 멈추고, 운지는 상대(iPad)로 전송돼 거기서 소리가 난다.
             NeckScreen(
                 viewModel: chordMode.neck,
-                onFingeringChanged: { peer.sendFingering($0) }
+                onFingeringChanged: { peer.sendFingering($0) },
+                // 넥 아래(줄보다 밑)에 포지션 바를 두고 그 자리는 프렛 짚기로 안 받는다.
+                extraExcludedRegions: [Self.neckPositionBarRegion]
             )
                 .ignoresSafeArea()
+                // 넥을 사운드홀 쪽 높은 프렛으로 옮기는 컨트롤 (슬라이더 ⟷ 모션 A/B).
+                .overlay {
+                    NeckPositionControl(controller: chordMode, slider: chordMode.sliderPosition)
+                        .frame(
+                            width: Self.neckPositionBarRegion.width,
+                            height: Self.neckPositionBarRegion.height
+                        )
+                        .position(x: Self.neckPositionBarRegion.midX, y: Self.neckPositionBarRegion.midY)
+                }
                 .onAppear {
                     chordMode.start()
                     chordMode.setConnected(peer.isConnected)
@@ -191,5 +206,54 @@ struct MainInstrumentScreen: View {
                 }
                 .onDisappear { strumProgression.stop() }
         }
+    }
+}
+
+// MARK: - 넥 포지션 컨트롤 (사운드홀 쪽 프렛으로 이동)
+
+/// 넥을 사운드홀 쪽 높은 프렛으로 옮기는 컨트롤. **슬라이더 ⟷ 모션**을 토글해 A/B로 비교한다.
+/// (docs/PLAN-neck-position)
+///
+/// - 슬라이더: 바를 움직여 포지션(1fr…8fr)을 정한다.
+/// - 모션: 기기를 기울여 옮긴다 — 바 대신 안내 문구만.
+private struct NeckPositionControl: View {
+    @ObservedObject var controller: ChordModeController
+    @ObservedObject var slider: SliderNeckPositionProvider
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Picker("", selection: Binding(
+                get: { controller.neckPositionMode },
+                set: { controller.setNeckPositionMode($0) }
+            )) {
+                ForEach(NeckPositionMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 150)
+
+            if controller.neckPositionMode == .slider {
+                Slider(
+                    value: Binding(get: { slider.sliderValue }, set: { slider.sliderValue = $0 }),
+                    in: 0...Double(max(slider.maxPosition, 1)),
+                    step: 1
+                )
+                .tint(Color.gsAccent)
+                Text("\(slider.position + 1)fr")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .frame(width: 36, alignment: .trailing)
+            } else {
+                Label("기기를 기울여 포지션 이동", systemImage: "iphone.gen3.radiowaves.left.and.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(maxHeight: .infinity)
+        .background(Capsule().fill(Color.black.opacity(0.5)))
     }
 }

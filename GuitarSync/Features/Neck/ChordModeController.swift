@@ -15,12 +15,25 @@ import Foundation
 /// 엔진 하나만 만들어 해소한다.
 @MainActor
 final class ChordModeController: ObservableObject {
+    /// 넥이 짚을 수 있는 최고 프렛 — 넥이 몸통(사운드홀)과 만나는 12프렛까지. 실제 기타의
+    /// 연주 영역(약 한 옥타브)과 맞춘 값. (docs/PLAN-neck-position)
+    static let maxFret = 12
+
     /// 넥 화면이 그대로 쓰는 뷰모델. 세션의 운지상태에 묶여 있다.
     let neck: NeckViewModel
 
     @Published private(set) var isPlaying = false
 
+    /// 지금 쓰는 넥 입력 방식 (A/B). 기본은 슬라이더.
+    @Published private(set) var neckPositionMode: NeckPositionMode = .slider
+
+    /// 🎚️ 슬라이더 버전 — 화면 슬라이드바가 바인딩한다.
+    let sliderPosition: SliderNeckPositionProvider
+    /// 📱 코어모션 버전.
+    let motionPosition: MotionNeckPositionProvider
+
     private let session: ChordPracticeSession
+    private var positionCancellable: AnyCancellable?
 
     /// 판정 햅틱 (H3). **기본은 꺼짐(target=nil)** — 모드 A엔 정답이 없기 때문 (SPEC §8).
     /// "이 코드를 짚어보세요" 식의 목표가 정해지면 `setTargetChord(_:)`로 켠다.
@@ -29,6 +42,11 @@ final class ChordModeController: ObservableObject {
     init(engine: GuitarAudioEngineProtocol? = nil, clock: BeatClockProtocol? = nil) {
         let engine = engine ?? GuitarAudioEngineFactory.makeDefault()
         let session = ChordPracticeSession(engine: engine, clock: clock)
+
+        // 화면엔 프렛 칸이 `fretCount`개 보이므로, 오프셋은 (최고 프렛 - 보이는 칸)까지 갈 수 있다.
+        let maxPosition = max(Self.maxFret - NeckGeometry.fretCount, 0)
+        self.sliderPosition = SliderNeckPositionProvider(maxPosition: maxPosition)
+        self.motionPosition = MotionNeckPositionProvider(maxPosition: maxPosition)
 
         self.session = session
         // 판정기를 넥의 운지 변화에 물려둔다. target이 없으면 아무 일도 안 한다.
@@ -40,15 +58,42 @@ final class ChordModeController: ObservableObject {
             audioEngine: nil,
             feedbackPublisher: session.notePlayed
         )
+
+        bindActiveProvider()
+    }
+
+    /// 지금 켜진 입력 방식.
+    private var activeProvider: NeckPositionProviding {
+        neckPositionMode == .slider ? sliderPosition : motionPosition
+    }
+
+    /// 켜진 공급자의 포지션 변화를 넥 오프셋에 물린다.
+    private func bindActiveProvider() {
+        let provider = activeProvider
+        positionCancellable = provider.positionChanged
+            .sink { [weak self] offset in self?.neck.setFretOffset(offset) }
+        neck.setFretOffset(provider.position)
+    }
+
+    /// 입력 방식을 바꾼다 (A/B 전환). 이전 방식은 멈추고 포지션은 처음(1프렛)으로 되돌린다.
+    func setNeckPositionMode(_ mode: NeckPositionMode) {
+        guard mode != neckPositionMode else { return }
+        activeProvider.stop()
+        sliderPosition.position = 0
+        neckPositionMode = mode
+        bindActiveProvider()
+        activeProvider.start()
     }
 
     // MARK: - 화면 수명주기
 
     func start() {
         session.startEngine()
+        activeProvider.start()
     }
 
     func end() {
+        activeProvider.stop()
         session.end()
         isPlaying = false
     }

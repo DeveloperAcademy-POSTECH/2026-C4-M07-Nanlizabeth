@@ -25,6 +25,10 @@ struct NeckScreen: View {
     /// 목표 코드의 손가락 번호(줄마다 하나). 있으면 고스트 위에 번호를 함께 안내한다.
     var targetFingers: [Int] = []
 
+    /// 넥 위에 얹은 컨트롤(포지션 바 등)의 영역 — 이 안의 터치는 프렛 짚기로 안 받는다.
+    /// 자유연주(모드 A)가 포지션 슬라이더 자리를 넣는다. 드릴은 비운다.
+    var extraExcludedRegions: [CGRect] = []
+
     var body: some View {
         ZStack {
             Image("iPhoneNeckBackground")
@@ -35,11 +39,12 @@ struct NeckScreen: View {
             strings
             targetMarkers
             pressMarkers
+            positionBadge
 
             // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
             // 지판 밖 터치는 `NeckGeometry.presses(at:majorRadius:)`가 걸러낸다.
             MultiTouchLayer(
-                excludedHitRegions: [InstrumentControlHitRegion.topBar],
+                excludedHitRegions: [InstrumentControlHitRegion.topBar] + extraExcludedRegions,
                 onSamplesChanged: { samples in
                     let presses = samples.values.flatMap {
                         NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)
@@ -153,6 +158,21 @@ struct NeckScreen: View {
                     .foregroundStyle(Color.gsTextSecondary)
                     .position(x: NeckGeometry.openMuteHintX, y: y)
             }
+        }
+    }
+
+    /// 넥이 사운드홀 쪽으로 옮겨졌을 때, 지금 화면 첫 칸이 몇 프렛인지 알려주는 배지.
+    /// (포지션 0 = 기존 1프렛 위치일 땐 숨긴다.)
+    @ViewBuilder
+    private var positionBadge: some View {
+        if viewModel.fretOffset > 0 {
+            Text("\(viewModel.fretOffset + 1)fr")
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.gsOnAccent)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.gsAccent))
+                .position(x: NeckGeometry.openMuteHintX, y: 40)
         }
     }
 
