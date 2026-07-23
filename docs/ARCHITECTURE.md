@@ -86,7 +86,7 @@
 ```
 GuitarSync/
 ├── App/                          # 진입점 + 화면 길안내
-│   ├── GuitarSyncApp.swift
+│   ├── ChordlyApp.swift
 │   ├── RootView.swift
 │   └── AppRouter.swift              [새로] §3.9
 │
