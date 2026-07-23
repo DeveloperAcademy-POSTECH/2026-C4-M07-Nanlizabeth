@@ -234,17 +234,21 @@ private struct NeckPositionControl: View {
             .frame(width: 150)
 
             if controller.neckPositionMode == .slider {
+                // 현재 포지션(프렛) 숫자는 왼쪽(사운드홀 방향)에.
+                Text("\(slider.position + 1)fr")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .frame(width: 36, alignment: .leading)
                 Slider(
                     value: Binding(get: { slider.sliderValue }, set: { slider.sliderValue = $0 }),
                     in: 0...Double(max(slider.maxPosition, 1)),
                     step: 1
                 )
                 .tint(Color.gsAccent)
-                Text("\(slider.position + 1)fr")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .frame(width: 36, alignment: .trailing)
+                // 넥과 방향을 맞춘다: **오른쪽=너트(1프렛), 왼쪽=사운드홀(높은 프렛)**.
+                // 손잡이가 오른쪽에서 시작해 사운드홀 쪽(왼쪽)으로 움직인다.
+                .scaleEffect(x: -1, y: 1)
             } else {
                 Label("기기를 기울여 포지션 이동", systemImage: "iphone.gen3.radiowaves.left.and.right")
                     .font(.system(size: 12, weight: .medium))

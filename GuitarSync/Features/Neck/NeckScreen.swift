@@ -36,9 +36,11 @@ struct NeckScreen: View {
                 .scaledToFill()
                 .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
                 .clipped()
+            inlays
             strings
             targetMarkers
             pressMarkers
+            fretNumbers
             positionBadge
 
             // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
@@ -68,6 +70,59 @@ struct NeckScreen: View {
     private var stageCenterX: CGFloat { NeckGeometry.stage.width / 2 }
 
     // MARK: - 레이어
+
+    /// 실제 기타처럼 특정 프렛에 찍는 포지션 마크 (인레이). 12프렛은 두 개.
+    private static let inlayFrets: Set<Int> = [3, 5, 7, 9, 12]
+
+    /// 프렛 칸마다 **몇 번째 프렛인지** 숫자로 (윗단). 포지션을 옮기면 그 값이 따라 바뀐다.
+    private var fretNumbers: some View {
+        ForEach(1...NeckGeometry.fretCount, id: \.self) { space in
+            if let x = NeckGeometry.fretCenterX(space) {
+                Text("\(space + viewModel.fretOffset)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.gsTextSecondary)
+                    .position(x: x, y: NeckGeometry.boardTop + 14)
+            }
+        }
+    }
+
+    /// 인레이(포지션 마크). **실제 프렛 기준**으로 3·5·7·9·12프렛에 찍는다.
+    /// 배경 이미지에 박힌 인레이(화면상 3·5프렛)는 포지션을 옮기면 실제 프렛과 어긋나므로 가린다.
+    private var inlays: some View {
+        ZStack {
+            if viewModel.fretOffset > 0 {
+                ForEach([3, 5], id: \.self) { baked in
+                    if let x = NeckGeometry.fretCenterX(baked) {
+                        Circle()
+                            .fill(Color.gsNeckSurface)
+                            .frame(width: NeckGeometry.inlayDiameter + 10, height: NeckGeometry.inlayDiameter + 10)
+                            .position(x: x, y: NeckGeometry.boardCenterY)
+                    }
+                }
+            }
+            ForEach(1...NeckGeometry.fretCount, id: \.self) { space in
+                let actualFret = space + viewModel.fretOffset
+                if Self.inlayFrets.contains(actualFret), let x = NeckGeometry.fretCenterX(space) {
+                    inlayDots(atFret: actualFret, x: x)
+                }
+            }
+        }
+    }
+
+    /// 인레이 점. 12프렛은 위아래 두 개, 나머지는 한가운데 한 개 — 실제 기타와 같다.
+    @ViewBuilder
+    private func inlayDots(atFret fret: Int, x: CGFloat) -> some View {
+        let dot = Circle()
+            .fill(Color.gsTextPrimary.opacity(0.85))
+            .overlay(Circle().stroke(Color.gsHardware, lineWidth: 1.5))
+            .frame(width: NeckGeometry.inlayDiameter, height: NeckGeometry.inlayDiameter)
+        if fret == 12 {
+            dot.position(x: x, y: NeckGeometry.stringYs[1])
+            dot.position(x: x, y: NeckGeometry.stringYs[4])
+        } else {
+            dot.position(x: x, y: NeckGeometry.boardCenterY)
+        }
+    }
 
     /// 6줄. 위가 저음(굵음), 아래가 고음(얇음).
     private var strings: some View {
