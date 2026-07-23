@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Chordly</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,13 +23,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>GuitarSync uses Bluetooth as a fallback to discover nearby iPhone and iPad prototypes.</string>
+	<string>Chordly uses Bluetooth as a fallback to discover nearby iPhone and iPad prototypes.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_gtrsync-demo._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>GuitarSync uses local network access to connect nearby iPhone and iPad prototypes.</string>
+	<string>Chordly uses local network access to connect nearby iPhone and iPad prototypes.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
