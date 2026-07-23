@@ -51,7 +51,9 @@ final class MotionNeckPositionProvider: NeckPositionProviding, ObservableObject 
 
     func start() {
         guard motion.isDeviceMotionAvailable, !motion.isDeviceMotionActive else { return }
+        // 켤 때마다 처음(1프렛)에서 시작 — 첫 샘플이 지금 자세를 중립으로 잡는다.
         neutral = nil
+        position = 0
         motion.deviceMotionUpdateInterval = 1.0 / 30.0
         motion.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
             guard let self, let data else { return }

@@ -83,10 +83,11 @@ final class ChordModeController: ObservableObject {
     func setNeckPositionMode(_ mode: NeckPositionMode) {
         guard mode != neckPositionMode else { return }
         activeProvider.stop()
-        sliderPosition.position = 0
         neckPositionMode = mode
-        bindActiveProvider()
+        sliderPosition.position = 0
+        // 새 입력을 먼저 켜서(모션은 여기서 포지션·중립을 처음으로 리셋) 초기값을 확정한 뒤 배선한다.
         activeProvider.start()
+        bindActiveProvider()
     }
 
     // MARK: - 화면 수명주기
