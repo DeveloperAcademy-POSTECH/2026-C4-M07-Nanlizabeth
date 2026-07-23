@@ -100,49 +100,33 @@ private struct SegmentedModeControl: View {
     let onModeChange: (PrototypeMode) -> Void
 
     var body: some View {
-        ZStack {
-            Color.clear
-                .glassEffect(.regular, in: .capsule)
-                .allowsHitTesting(false)
-
-            HStack(spacing: 0) {
-                segment("코드", isSelected: mode == .chord, isHighlighted: false) {
-                    onModeChange(.chord)
+        Picker(
+            "연주 모드",
+            selection: Binding(
+                get: { mode },
+                set: { nextMode in
+                    guard nextMode != mode else { return }
+                    onModeChange(nextMode)
                 }
-                segment(
-                    "스트로크",
-                    isSelected: mode == .strum,
-                    isHighlighted: highlightsStrumSegment
-                ) {
-                    onModeChange(.strum)
-                }
+            )
+        ) {
+            Text("코드")
+                .tag(PrototypeMode.chord)
+            Text("스트로크")
+                .tag(PrototypeMode.strum)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.large)
+        .font(.system(size: 15, weight: .semibold))
+        .overlay(alignment: .trailing) {
+            if highlightsStrumSegment {
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: 155)
+                    .tutorialPulseHighlight(true, cornerRadius: 23)
+                    .allowsHitTesting(false)
             }
         }
-    }
-
-    private func segment(
-        _ title: String,
-        isSelected: Bool,
-        isHighlighted: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background {
-                    if isSelected {
-                        Color.clear
-                            .glassEffect(
-                                .regular.tint(Color.white.opacity(0.12)),
-                                in: .capsule
-                            )
-                            .allowsHitTesting(false)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
-        .tutorialPulseHighlight(isHighlighted, cornerRadius: 23)
     }
 }

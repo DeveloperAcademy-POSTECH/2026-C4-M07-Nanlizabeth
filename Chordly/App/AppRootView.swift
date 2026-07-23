@@ -31,6 +31,11 @@ struct AppRootView: View {
     /// 첫 실행 튜토리얼 — 온보딩 뒤에 실제 화면 위로 대화창을 얹어 단계를 진행한다.
     @StateObject private var tutorial = TutorialController()
 
+    /// 첫 실행 튜토리얼은 왼손 코드 조작이 있는 iPhone에서만 진행한다.
+    private var supportsTutorial: Bool {
+        DeviceInfoProvider.currentDeviceType != .iPad
+    }
+
     /// iPad **스트럼**만 Figma iPad 4:3 도화지(1366×1024)를 쓴다 — 배경 이미지가 화면을 꽉 채우도록.
     /// 나머지 화면·기기는 기존 iPhone 도화지(874×402) 그대로. (iPad 다른 화면들의 4:3 재배치는 이후 작업)
     private var stageReference: CGSize {
@@ -47,7 +52,7 @@ struct AppRootView: View {
                 screen
 
                 // 이미 완성된 화면 위에 튜토리얼 대화창을 얹는다. 대화창 밖 터치는 막지 않는다.
-                if tutorial.isOverlayVisible {
+                if supportsTutorial, tutorial.isOverlayVisible {
                     TutorialOverlay(tutorial: tutorial)
                 }
             }
@@ -100,7 +105,7 @@ struct AppRootView: View {
     /// 튜토리얼 시작 자격 판정. **iPad는 별도 튜토리얼이 없다** (코드 짚기 0단계가 iPad엔 불가능해
     /// 영원히 멈춘다) — iPhone에서 온보딩을 마친 뒤에만 시작한다.
     private func startTutorialIfEligible(on route: AppRoute) {
-        guard route != .onboarding, DeviceInfoProvider.currentDeviceType != .iPad else { return }
+        guard supportsTutorial, route != .onboarding else { return }
         tutorial.startIfNeeded()
     }
 
@@ -154,7 +159,7 @@ struct AppRootView: View {
                 // 넥(모드 A)에서 코드 드릴 연습으로 진입 — 먼저 노래를 고른다.
                 onStartDrill: { router.navigate(to: .chordDrillSongSelect) },
                 // 튜토리얼: 넥 목표 코드 표시 + 짚기·튕기기 동작 검증.
-                tutorial: tutorial
+                tutorial: supportsTutorial ? tutorial : nil
             )
 
         case .chordDrillSongSelect:

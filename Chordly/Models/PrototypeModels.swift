@@ -1,4 +1,4 @@
-enum PrototypeMode {
+enum PrototypeMode: Hashable {
     case chord
     case strum
 }
