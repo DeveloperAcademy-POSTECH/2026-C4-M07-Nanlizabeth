@@ -4,6 +4,7 @@ import SwiftUI
 /// TopControlBar의 기존 위치·크기(상단 20, 우측 60, 최대 너비 690)를 그대로 반영한다.
 enum InstrumentControlHitRegion {
     static let topBar = CGRect(x: 116, y: 12, width: 706, height: 62)
+    static let peerPopover = CGRect(x: 60, y: 76, width: 276, height: 240)
 }
 
 struct TopControlBar: View {
@@ -50,12 +51,17 @@ struct TopControlBar: View {
                         action: onTogglePlayback
                     )
 
-                    LiquidGlassTextButton(actionTitle, action: onAction)
+                    LiquidGlassAssetIconButton(
+                        assetName: actionTitle == "C" ? "chordSelectIcon" : "strumSelectIcon",
+                        action: onAction
+                    )
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
 
-            LiquidGlassIconButton(systemName: isExpanded ? "chevron.right" : "chevron.left") {
+            LiquidGlassCompactToggleButton(
+                systemName: isExpanded ? "chevron.compact.right" : "chevron.compact.left"
+            ) {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                     onToggleControls()
                 }

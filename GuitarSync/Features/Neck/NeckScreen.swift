@@ -24,6 +24,7 @@ struct NeckScreen: View {
 
     /// 목표 코드의 손가락 번호(줄마다 하나). 있으면 고스트 위에 번호를 함께 안내한다.
     var targetFingers: [Int] = []
+    var excludedHitRegions: [CGRect] = [InstrumentControlHitRegion.topBar]
 
     /// 넥 위에 얹은 컨트롤(포지션 바 등)의 영역 — 이 안의 터치는 프렛 짚기로 안 받는다.
     /// 자유연주(모드 A)가 포지션 슬라이더 자리를 넣는다. 드릴은 비운다.
@@ -48,7 +49,8 @@ struct NeckScreen: View {
             // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
             // 지판 밖 터치는 `NeckGeometry.presses(at:majorRadius:)`가 걸러낸다.
             MultiTouchLayer(
-                excludedHitRegions: [InstrumentControlHitRegion.topBar] + extraExcludedRegions,
+                // #36의 excludedHitRegions(기본 상단바) + 내 extraExcludedRegions(포지션 바) 둘 다 제외.
+                excludedHitRegions: excludedHitRegions + extraExcludedRegions,
                 onSamplesChanged: { samples in
                     let presses = samples.values.flatMap {
                         NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)

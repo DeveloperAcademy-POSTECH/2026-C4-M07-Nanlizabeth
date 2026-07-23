@@ -8,6 +8,7 @@ struct GuitarStrumView: View {
     /// iPad는 Figma 하이파이 이미지를 배경으로 깔고, 그 위에 투명 터치 레이어만 얹는다.
     /// iPhone은 기존(갈색) SwiftUI 레이아웃 그대로. 터치·소리 로직은 두 경우 공통.
     var isPad: Bool
+    var excludedHitRegions: [CGRect]
 
     /// 스테이지(도화지→화면) 배율. iPhone·iPad **모두** 넥(줄 밴드)을 화면상 **고정 크기**로
     /// 유지하려고 이 배율로 역보정한다 — 기기 크기가 달라도 넥 두께가 항상 같다.
@@ -26,16 +27,19 @@ struct GuitarStrumView: View {
         self.viewModel = GuitarStrumViewModel()
         self.stringAssetNames = Self.defaultStringAssetNames
         self.isPad = false
+        self.excludedHitRegions = [InstrumentControlHitRegion.topBar]
     }
 
     init(
         viewModel: GuitarStrumViewModel,
         stringAssetNames: [String] = Self.defaultStringAssetNames,
-        isPad: Bool = false
+        isPad: Bool = false,
+        excludedHitRegions: [CGRect] = [InstrumentControlHitRegion.topBar]
     ) {
         self.viewModel = viewModel
         self.stringAssetNames = stringAssetNames
         self.isPad = isPad
+        self.excludedHitRegions = excludedHitRegions
     }
 
     var body: some View {
@@ -54,7 +58,7 @@ struct GuitarStrumView: View {
                 // 소리는 이 투명 레이어를 통해 요청된다. **손가락을 전부 받는다** — 아르페지오처럼
                 // 여러 줄을 동시에 튕기려면 필요하다. 터치 영역은 화면 전체, 줄 매핑은 stringBand.
                 MultiTouchLayer(
-                    excludedHitRegions: [InstrumentControlHitRegion.topBar],
+                    excludedHitRegions: excludedHitRegions,
                     onTouchesChanged: { touches in
                         viewModel.handleTouchesChanged(touches, band: stringBand)
                     }
