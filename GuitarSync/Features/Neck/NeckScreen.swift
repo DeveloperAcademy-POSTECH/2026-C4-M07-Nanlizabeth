@@ -26,21 +26,31 @@ struct NeckScreen: View {
     var targetFingers: [Int] = []
     var excludedHitRegions: [CGRect] = [InstrumentControlHitRegion.topBar]
 
+    /// 넥 위에 얹은 컨트롤(포지션 바 등)의 영역 — 이 안의 터치는 프렛 짚기로 안 받는다.
+    /// 자유연주(모드 A)가 포지션 슬라이더 자리를 넣는다. 드릴은 비운다.
+    var extraExcludedRegions: [CGRect] = []
+
     var body: some View {
         ZStack {
-            Image("iPhoneNeckBackground")
+            // 포지션에 따라 배경을 바꾼다: **1프렛(포지션 0)일 땐 너트 끝이 두꺼운 이미지**로
+            // "넥의 끝"임을 보이고, 사운드홀 쪽으로 옮기면(포지션>0) 너트 없는 이미지로 갈아끼운다.
+            Image(viewModel.fretOffset == 0 ? "iPhoneNeckBackground" : "iPhoneNeckBackgroundShifted")
                 .resizable()
                 .scaledToFill()
                 .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
                 .clipped()
+            inlays
             strings
             targetMarkers
             pressMarkers
+            fretNumbers
+            positionBadge
 
             // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
             // 지판 밖 터치는 `NeckGeometry.presses(at:majorRadius:)`가 걸러낸다.
             MultiTouchLayer(
-                excludedHitRegions: excludedHitRegions,
+                // #36의 excludedHitRegions(기본 상단바) + 내 extraExcludedRegions(포지션 바) 둘 다 제외.
+                excludedHitRegions: excludedHitRegions + extraExcludedRegions,
                 onSamplesChanged: { samples in
                     let presses = samples.values.flatMap {
                         NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)
@@ -64,6 +74,47 @@ struct NeckScreen: View {
     private var stageCenterX: CGFloat { NeckGeometry.stage.width / 2 }
 
     // MARK: - 레이어
+
+    /// 실제 기타처럼 특정 프렛에 찍는 포지션 마크 (인레이). 12프렛은 두 개.
+    private static let inlayFrets: Set<Int> = [3, 5, 7, 9, 12]
+
+    /// 프렛 칸마다 **몇 번째 프렛인지** 숫자로 (윗단). 포지션을 옮기면 그 값이 따라 바뀐다.
+    private var fretNumbers: some View {
+        ForEach(1...NeckGeometry.fretCount, id: \.self) { space in
+            if let x = NeckGeometry.fretCenterX(space) {
+                Text("\(space + viewModel.fretOffset)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.gsTextSecondary)
+                    .position(x: x, y: NeckGeometry.boardTop + 14)
+            }
+        }
+    }
+
+    /// 인레이(포지션 마크). **실제 프렛 기준**으로 3·5·7·9·12프렛에 동적으로 찍는다.
+    /// 배경 이미지엔 인레이가 없으므로(953-2623 넥) 포지션을 옮기면 이 점들도 함께 이동한다.
+    private var inlays: some View {
+        ForEach(1...NeckGeometry.fretCount, id: \.self) { space in
+            let actualFret = space + viewModel.fretOffset
+            if Self.inlayFrets.contains(actualFret), let x = NeckGeometry.fretCenterX(space) {
+                inlayDots(atFret: actualFret, x: x)
+            }
+        }
+    }
+
+    /// 인레이 점. 12프렛은 위아래 두 개, 나머지는 한가운데 한 개 — 실제 기타와 같다.
+    @ViewBuilder
+    private func inlayDots(atFret fret: Int, x: CGFloat) -> some View {
+        let dot = Circle()
+            .fill(Color.gsTextPrimary.opacity(0.85))
+            .overlay(Circle().stroke(Color.gsHardware, lineWidth: 1.5))
+            .frame(width: NeckGeometry.inlayDiameter, height: NeckGeometry.inlayDiameter)
+        if fret == 12 {
+            dot.position(x: x, y: NeckGeometry.stringYs[1])
+            dot.position(x: x, y: NeckGeometry.stringYs[4])
+        } else {
+            dot.position(x: x, y: NeckGeometry.boardCenterY)
+        }
+    }
 
     /// 6줄. 위가 저음(굵음), 아래가 고음(얇음).
     private var strings: some View {
@@ -154,6 +205,21 @@ struct NeckScreen: View {
                     .foregroundStyle(Color.gsTextSecondary)
                     .position(x: NeckGeometry.openMuteHintX, y: y)
             }
+        }
+    }
+
+    /// 넥이 사운드홀 쪽으로 옮겨졌을 때, 지금 화면 첫 칸이 몇 프렛인지 알려주는 배지.
+    /// (포지션 0 = 기존 1프렛 위치일 땐 숨긴다.)
+    @ViewBuilder
+    private var positionBadge: some View {
+        if viewModel.fretOffset > 0 {
+            Text("\(viewModel.fretOffset + 1)fr")
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.gsOnAccent)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.gsAccent))
+                .position(x: NeckGeometry.openMuteHintX, y: 40)
         }
     }
 

@@ -70,6 +70,14 @@ final class ChordPracticeSession: ObservableObject {
         engine?.start()
     }
 
+    /// **짚은 줄이 즉시 소리 날지**(개별 발음, SPEC §4)를 켜고 끈다.
+    ///
+    /// 자동 주법이 도는 동안엔 꺼서(`.silent`) 짚기는 조용하고 주법만 소리 내지만,
+    /// **단독 + 자동재생 전**엔 켜서(`.pluckOnPress`) 짚는 줄 소리를 바로 들려준다.
+    func setFrettingSounds(_ enabled: Bool) {
+        fingeringState.soundPolicy = enabled ? .pluckOnPress : .silent
+    }
+
     /// 자동 주법을 시작한다. 재생(▶) 버튼이 부른다.
     ///
     /// - Parameter bpm: 유저가 정한 BPM. `nil`이면 주법의 권장 BPM.
