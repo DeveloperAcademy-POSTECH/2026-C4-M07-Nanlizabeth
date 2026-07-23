@@ -64,7 +64,7 @@ struct TutorialOverlay: View {
     // MARK: 내용
 
     private var headerText: String {
-        tutorial.isCelebrating ? "Tutorial Complete" : "\(tutorial.stepIndex + 1) / \(tutorial.totalSteps)"
+        tutorial.isCelebrating ? "Tutorial Complete" : "\(tutorial.displayStepNumber) / \(tutorial.displayTotalSteps)"
     }
 
     private var bodyText: String {

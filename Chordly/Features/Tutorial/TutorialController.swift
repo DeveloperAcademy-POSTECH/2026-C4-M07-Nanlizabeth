@@ -92,10 +92,16 @@ final class TutorialController: ObservableObject {
     // MARK: 조회
 
     var currentStep: TutorialStep? { steps.indices.contains(stepIndex) ? steps[stepIndex] : nil }
-    var totalSteps: Int { steps.count }
     var isRunning: Bool { phase == .running }
     var isCelebrating: Bool { phase == .celebrating }
     var isOverlayVisible: Bool { phase == .running || phase == .celebrating }
+
+    /// 대화창 "n / 총" 표시용. 두 경로 길이가 달라서 **밟는 단계 수에 맞춘다** — 배열 인덱스를
+    /// 그대로 쓰면 분기 단계(맨 끝) 때문에 단독 경로가 "7/8"에서 끝나고 연결 경로는 "5/8→8/8"로 튄다.
+    /// 단독(스킵) 경로는 5·6단계까지 7단계, 실제 연결 경로는 5·6을 건너뛰어 6단계.
+    private var isOnRemoteStrumStep: Bool { stepIndex == remoteStrumStepIndex }
+    var displayTotalSteps: Int { isOnRemoteStrumStep ? connectStepIndex + 2 : steps.count - 1 }
+    var displayStepNumber: Int { isOnRemoteStrumStep ? connectStepIndex + 2 : stepIndex + 1 }
 
     /// 지금 넥에 표시할 목표 코드 (진행 중 + 그 단계에 목표가 있을 때).
     var neckTargetChord: GuitarChord? { isRunning ? currentStep?.targetChord : nil }
