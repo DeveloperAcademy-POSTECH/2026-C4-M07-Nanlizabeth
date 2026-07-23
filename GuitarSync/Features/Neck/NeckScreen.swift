@@ -31,7 +31,9 @@ struct NeckScreen: View {
 
     var body: some View {
         ZStack {
-            Image("iPhoneNeckBackground")
+            // 포지션에 따라 배경을 바꾼다: **1프렛(포지션 0)일 땐 너트 끝이 두꺼운 이미지**로
+            // "넥의 끝"임을 보이고, 사운드홀 쪽으로 옮기면(포지션>0) 너트 없는 이미지로 갈아끼운다.
+            Image(viewModel.fretOffset == 0 ? "iPhoneNeckBackground" : "iPhoneNeckBackgroundShifted")
                 .resizable()
                 .scaledToFill()
                 .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
