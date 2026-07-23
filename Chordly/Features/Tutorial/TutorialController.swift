@@ -36,6 +36,7 @@ enum TutorialEvent: Equatable {
     case patternSelected                 // 스트로크 패턴 고름
     case connected                       // iPad와 연결됨
     case strummed                        // 줄을 튕김
+    case remoteStrummed                  // 연결된 iPad가 튕김 (스트로크 햅틱을 받음)
 }
 
 // MARK: - 단계
@@ -76,6 +77,12 @@ final class TutorialController: ObservableObject {
     let steps: [TutorialStep]
     private let store: TutorialStoreProtocol
 
+    /// 연결 단계 인덱스 (makeSteps 순서 기준). 여기서 **실제로** 연결되면 iPhone에서 직접 긁는
+    /// 5·6단계 대신 "iPad를 들고 치라"는 마지막 단계로 분기한다.
+    private let connectStepIndex = 4
+    /// 실제 연결됐을 때만 닿는 마지막 단계 — 배열 맨 끝에 붙여 순차 진행으로는 오지 않는다.
+    private var remoteStrumStepIndex: Int { steps.count - 1 }
+
     init(store: TutorialStoreProtocol? = nil) {
         // 기본값을 인자 자리에 두면 nonisolated 문맥에서 평가돼 @MainActor와 충돌한다.
         self.store = store ?? TutorialStore()
@@ -109,6 +116,12 @@ final class TutorialController: ObservableObject {
     /// 실제 화면이 동작을 알려온다. 지금 단계와 맞으면 넘어간다(마지막은 완료 버튼만 켠다).
     func handle(_ event: TutorialEvent) {
         guard phase == .running, let step = currentStep, step.matches(event) else { return }
+        // 연결 단계에서 iPad가 **정말로** 붙으면: 짝이 생겼으니 iPhone에서 스트럼 모드로
+        // 넘어가는 5·6단계는 틀린 안내다. iPad를 들고 치라는 마지막 단계로 곧장 분기한다.
+        if case .connected = event, stepIndex == connectStepIndex {
+            jumpToRemoteStrumStep()
+            return
+        }
         if step.showsCompleteButton {
             lastActionDone = true          // 완료 버튼 활성화 (자동 진행 안 함)
         } else {
@@ -138,9 +151,17 @@ final class TutorialController: ObservableObject {
         lastActionDone = false
         if stepIndex + 1 < steps.count {
             stepIndex += 1
+            HapticsManager.impact()        // 단계가 넘어갔다는 걸 손끝으로 약하게 알린다.
         } else {
             phase = .celebrating
         }
+    }
+
+    /// 실제 연결 시 마지막 "iPad로 치기" 단계로 건너뛴다. (순차 진행이 아니라 분기)
+    private func jumpToRemoteStrumStep() {
+        lastActionDone = false
+        stepIndex = remoteStrumStepIndex
+        HapticsManager.impact()            // 분기도 단계 전환이므로 동일하게 약한 피드백.
     }
 
     // MARK: 단계 정의
@@ -189,6 +210,13 @@ final class TutorialController: ObservableObject {
             TutorialStep(
                 message: "위아래로 줄을 튕겨 기타를 연주해보세요.",
                 matches: { if case .strummed = $0 { return true }; return false },
+                showsCompleteButton: true
+            ),
+            // 연결됐을 때만 분기로 닿는 마지막 단계 (순차로는 앞 단계에서 celebrating으로 끝나 오지 않는다).
+            // iPhone이 아니라 짝을 이룬 iPad가 튕겼다는 신호(remoteStrummed)로만 완료된다.
+            TutorialStep(
+                message: "이제 아이패드를 들고 스트로크를 연주해보세요.",
+                matches: { if case .remoteStrummed = $0 { return true }; return false },
                 showsCompleteButton: true
             ),
         ]

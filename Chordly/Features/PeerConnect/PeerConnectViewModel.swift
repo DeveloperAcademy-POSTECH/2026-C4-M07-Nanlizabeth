@@ -16,6 +16,9 @@ final class PeerConnectViewModel: ObservableObject {
     /// 연결된 상대 이름 (피드백 표시용).
     @Published private(set) var connectedPeerName: String?
 
+    /// 상대(iPad)가 튕길 때마다 오른다 — 튜토리얼이 "짝이 실제로 연주했다"를 감지하는 신호.
+    @Published private(set) var remoteStrumTick: Int = 0
+
     /// 이 기기가 맡는 손. 협상 없이 기기 종류로 정해진다.
     let role: PeerHandRole
 
@@ -173,6 +176,7 @@ final class PeerConnectViewModel: ObservableObject {
                 if let velocity = message.number {
                     self.strumHaptics.pluck(velocity: UInt8(clamping: velocity))
                 }
+                self.remoteStrumTick += 1   // 튜토리얼 마지막 단계 검증용 신호.
             default:
                 break
             }
