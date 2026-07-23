@@ -8,7 +8,10 @@ struct BPMPopover: View {
     @State private var editText = ""
     @FocusState private var fieldFocused: Bool
 
-    private let range: ClosedRange<Double> = 40...240
+    /// 현실적으로 쓰이는 BPM 범위. (초보 기타·동요/포크 기준 리서치)
+    /// 초보 코드 전환 연습은 50~70, 대중가요는 대부분 80~140에 몰려 있고 빠른 곡도 ~168.
+    /// 그래서 느린 연습(50)~빠른 곡(180)으로 좁혔다 — 기존 40~240은 스트러밍엔 비현실적.
+    private let range: ClosedRange<Double> = 50...180
 
     var body: some View {
         HStack(spacing: 8) {
