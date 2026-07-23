@@ -146,9 +146,10 @@ final class TutorialController: ObservableObject {
         }
     }
 
-    /// "이 단계 건너뛰기".
+    /// "이 단계 건너뛰기". **완료 버튼 단계(마지막)는 건너뛸 수 없다** — 실제 동작으로만 끝난다.
+    /// (UI가 버튼을 숨기지만, 전환 프레임의 잔여 탭이 여기로 새지 않게 호출부에도 막이를 둔다.)
     func skip() {
-        guard phase == .running else { return }
+        guard phase == .running, currentStep?.showsCompleteButton == false else { return }
         advance()
     }
 
@@ -166,7 +167,10 @@ final class TutorialController: ObservableObject {
 
     private func advance() {
         lastActionDone = false
-        if stepIndex + 1 < steps.count {
+        // 배열 맨 끝 합주 단계(remoteStrumStepIndex)는 **연결 분기로만** 닿아야 한다.
+        // 순차 진행이 솔로 마지막 단계를 넘어가면 그 합주 단계로 새지 않고 축하로 끝낸다 —
+        // 안 그러면 연결 안 한 사용자가 "아이패드로 튕겨달라" 단계에 갇힌다(완료 비활성).
+        if stepIndex + 1 < remoteStrumStepIndex {
             stepIndex += 1
             HapticsManager.impact()        // 단계가 넘어갔다는 걸 손끝으로 약하게 알린다.
         } else {
