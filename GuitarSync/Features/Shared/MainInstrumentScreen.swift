@@ -153,7 +153,7 @@ struct MainInstrumentScreen: View {
                 .ignoresSafeArea()
                 // 넥을 사운드홀 쪽 높은 프렛으로 옮기는 컨트롤 (슬라이더 ⟷ 모션 A/B).
                 .overlay {
-                    NeckPositionControl(controller: chordMode, slider: chordMode.sliderPosition)
+                    NeckPositionControl(slider: chordMode.sliderPosition)
                         .frame(
                             width: Self.neckPositionBarRegion.width,
                             height: Self.neckPositionBarRegion.height
@@ -211,50 +211,31 @@ struct MainInstrumentScreen: View {
 
 // MARK: - 넥 포지션 컨트롤 (사운드홀 쪽 프렛으로 이동)
 
-/// 넥을 사운드홀 쪽 높은 프렛으로 옮기는 컨트롤. **슬라이더 ⟷ 모션**을 토글해 A/B로 비교한다.
+/// 넥을 사운드홀 쪽 높은 프렛으로 옮기는 컨트롤 — **슬라이더**로 포지션(1fr…8fr)을 정한다.
 /// (docs/PLAN-neck-position)
 ///
-/// - 슬라이더: 바를 움직여 포지션(1fr…8fr)을 정한다.
-/// - 모션: 기기를 기울여 옮긴다 — 바 대신 안내 문구만.
+/// - Note: 모션 입력은 아직 불안정해서 **UI에선 숨겼다.** 기능(`MotionNeckPositionProvider`·A/B
+///   전환)은 그대로 남아 있어, 안정화되면 토글만 다시 노출하면 된다.
 private struct NeckPositionControl: View {
-    @ObservedObject var controller: ChordModeController
     @ObservedObject var slider: SliderNeckPositionProvider
 
     var body: some View {
         HStack(spacing: 10) {
-            Picker("", selection: Binding(
-                get: { controller.neckPositionMode },
-                set: { controller.setNeckPositionMode($0) }
-            )) {
-                ForEach(NeckPositionMode.allCases) { mode in
-                    Text(mode.displayName).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 150)
-
-            if controller.neckPositionMode == .slider {
-                // 현재 포지션(프렛) 숫자는 왼쪽(사운드홀 방향)에.
-                Text("\(slider.position + 1)fr")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .frame(width: 36, alignment: .leading)
-                Slider(
-                    value: Binding(get: { slider.sliderValue }, set: { slider.sliderValue = $0 }),
-                    in: 0...Double(max(slider.maxPosition, 1)),
-                    step: 1
-                )
-                .tint(Color.gsAccent)
-                // 넥과 방향을 맞춘다: **오른쪽=너트(1프렛), 왼쪽=사운드홀(높은 프렛)**.
-                // 손잡이가 오른쪽에서 시작해 사운드홀 쪽(왼쪽)으로 움직인다.
-                .scaleEffect(x: -1, y: 1)
-            } else {
-                Label("기기를 기울여 포지션 이동", systemImage: "iphone.gen3.radiowaves.left.and.right")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.75))
-                    .frame(maxWidth: .infinity)
-            }
+            // 현재 포지션(프렛) 숫자는 왼쪽(사운드홀 방향)에.
+            Text("\(slider.position + 1)fr")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .frame(width: 36, alignment: .leading)
+            Slider(
+                value: Binding(get: { slider.sliderValue }, set: { slider.sliderValue = $0 }),
+                in: 0...Double(max(slider.maxPosition, 1)),
+                step: 1
+            )
+            .tint(Color.gsAccent)
+            // 넥과 방향을 맞춘다: **오른쪽=너트(1프렛), 왼쪽=사운드홀(높은 프렛)**.
+            // 손잡이가 오른쪽에서 시작해 사운드홀 쪽(왼쪽)으로 움직인다.
+            .scaleEffect(x: -1, y: 1)
         }
         .padding(.horizontal, 14)
         .frame(maxHeight: .infinity)
