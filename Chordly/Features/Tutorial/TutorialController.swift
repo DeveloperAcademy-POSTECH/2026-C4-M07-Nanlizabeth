@@ -59,6 +59,9 @@ struct TutorialStep {
     var targetChord: GuitarChord? = nil
     /// 지금 눌러야 할 화면 컨트롤. 해당 뷰가 라임 펄스로 표시한다.
     var highlightTarget: TutorialHighlightTarget? = nil
+    /// 이 단계에서 넥에 들어오면 **자동재생을 바로 켠다** — 고른 스트로크가 계속 돌며 들리게.
+    /// (안 켜면 짚을 때 개별 발음만 한 번 나고 스트로크를 체험할 수 없다.)
+    var autoPlaysStrum = false
 }
 
 // MARK: - 컨트롤러
@@ -108,6 +111,8 @@ final class TutorialController: ObservableObject {
     var highlightTarget: TutorialHighlightTarget? {
         isRunning ? currentStep?.highlightTarget : nil
     }
+    /// 지금 단계가 넥에서 고른 스트로크를 자동으로 돌려 들려줘야 하는가.
+    var shouldAutoPlayStrum: Bool { isRunning && (currentStep?.autoPlaysStrum ?? false) }
 
     // MARK: 진행
 
@@ -207,10 +212,11 @@ final class TutorialController: ObservableObject {
                 highlightTarget: .strumPatternCard
             ),
             TutorialStep(
-                message: "오른쪽 위 체크 버튼으로 돌아가 표시된 코드를 다시 잡아보세요.",
+                message: "오른쪽 위 체크 버튼으로 돌아가 코드를 잡고, 고른 스트로크를 들어보세요.",
                 matches: frettedFirstChord,
                 targetChord: firstChord,
-                highlightTarget: .returnToChord
+                highlightTarget: .returnToChord,
+                autoPlaysStrum: true
             ),
             TutorialStep(
                 message: "아이패드가 있다면 버튼을 눌러 연결해보세요. 없으면 건너뛰어도 괜찮아요.",
