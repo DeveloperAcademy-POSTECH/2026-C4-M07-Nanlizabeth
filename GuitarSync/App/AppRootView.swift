@@ -63,7 +63,10 @@ struct AppRootView: View {
         .onChange(of: prototypeViewModel.screen) { _, screen in
             switch screen {
             case .main: break
-            case .strumSelect: router.navigate(to: .strokeSelect)
+            case .strumSelect:
+                router.navigate(to: .strokeSelect)
+                // route onChange 체이닝 타이밍에 의존하지 않도록 튜토리얼에 직접 알린다.
+                tutorial.handle(.navigated(.strokeSelect))
             case .chordProgression: router.navigate(to: .progressionSelect)
             }
         }
@@ -124,7 +127,9 @@ struct AppRootView: View {
                 // 모드 토글이 **라우터 route까지** 바꾼다 — 그래야 선택·뒤로가기가 그 모드로 돌아온다.
                 onModeChange: { mode in
                     prototypeViewModel.showBPM = false
-                    router.replaceRoot(with: mode == .chord ? .neck : .strum)
+                    let route: AppRoute = mode == .chord ? .neck : .strum
+                    router.replaceRoot(with: route)
+                    tutorial.handle(.navigated(route))   // 튜토리얼: 스트로크 모드 이동 직접 검증
                 },
                 // 넥(모드 A)에서 코드 드릴 연습으로 진입 — 먼저 노래를 고른다.
                 onStartDrill: { router.navigate(to: .chordDrillSongSelect) },

@@ -133,7 +133,8 @@ final class TutorialController: ObservableObject {
     // MARK: 단계 정의
 
     private static func makeSteps() -> [TutorialStep] {
-        let firstChord = GuitarChord.c
+        // Em을 쓴다: 짚는 자리(A·D현 2프렛)가 넥 위쪽이라 하단 대화창에 안 가리고, 2손가락이라 쉽다.
+        let firstChord = GuitarChord.em
         func frettedFirstChord(_ event: TutorialEvent) -> Bool {
             if case let .chordFretted(f) = event {
                 return ChordJudge.matches(played: f.frets, target: firstChord.fingering.frets)
