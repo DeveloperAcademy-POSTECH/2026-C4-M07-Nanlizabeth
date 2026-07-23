@@ -53,6 +53,31 @@ struct LiquidGlassIconButton: View {
     }
 }
 
+/// 커스텀 SVG 에셋을 표시하는 Liquid Glass 버튼.
+/// 기존 C/S 텍스트 버튼과 같은 62×46 프레임을 유지한다.
+struct LiquidGlassAssetIconButton: View {
+    let assetName: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(assetName)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 28)
+                .frame(width: 62, height: 46)
+                .background {
+                    Color.clear
+                        .glassEffect(.regular, in: .circle)
+                        .allowsHitTesting(false)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct PeerLiquidGlassButton: View {
     let state: PrototypePeerButtonState
     let action: () -> Void
@@ -74,11 +99,11 @@ struct PeerLiquidGlassButton: View {
     private var systemName: String {
         switch state {
         case .disconnected:
-            return "link.badge.plus"
+            return "rectangle.badge.plus"
         case .connecting:
             return "link"
         case .connected:
-            return "link.circle.fill"
+            return "ipad.randscape.and.iphone"
         }
     }
 

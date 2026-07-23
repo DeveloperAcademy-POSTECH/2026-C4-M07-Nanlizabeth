@@ -50,7 +50,10 @@ struct TopControlBar: View {
                         action: onTogglePlayback
                     )
 
-                    LiquidGlassTextButton(actionTitle, action: onAction)
+                    LiquidGlassAssetIconButton(
+                        assetName: actionTitle == "C" ? "chordSelectIcon" : "strumSelectIcon",
+                        action: onAction
+                    )
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
