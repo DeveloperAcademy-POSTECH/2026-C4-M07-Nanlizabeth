@@ -86,25 +86,13 @@ struct NeckScreen: View {
         }
     }
 
-    /// 인레이(포지션 마크). **실제 프렛 기준**으로 3·5·7·9·12프렛에 찍는다.
-    /// 배경 이미지에 박힌 인레이(화면상 3·5프렛)는 포지션을 옮기면 실제 프렛과 어긋나므로 가린다.
+    /// 인레이(포지션 마크). **실제 프렛 기준**으로 3·5·7·9·12프렛에 동적으로 찍는다.
+    /// 배경 이미지엔 인레이가 없으므로(953-2623 넥) 포지션을 옮기면 이 점들도 함께 이동한다.
     private var inlays: some View {
-        ZStack {
-            if viewModel.fretOffset > 0 {
-                ForEach([3, 5], id: \.self) { baked in
-                    if let x = NeckGeometry.fretCenterX(baked) {
-                        Circle()
-                            .fill(Color.gsNeckSurface)
-                            .frame(width: NeckGeometry.inlayDiameter + 10, height: NeckGeometry.inlayDiameter + 10)
-                            .position(x: x, y: NeckGeometry.boardCenterY)
-                    }
-                }
-            }
-            ForEach(1...NeckGeometry.fretCount, id: \.self) { space in
-                let actualFret = space + viewModel.fretOffset
-                if Self.inlayFrets.contains(actualFret), let x = NeckGeometry.fretCenterX(space) {
-                    inlayDots(atFret: actualFret, x: x)
-                }
+        ForEach(1...NeckGeometry.fretCount, id: \.self) { space in
+            let actualFret = space + viewModel.fretOffset
+            if Self.inlayFrets.contains(actualFret), let x = NeckGeometry.fretCenterX(space) {
+                inlayDots(atFret: actualFret, x: x)
             }
         }
     }
