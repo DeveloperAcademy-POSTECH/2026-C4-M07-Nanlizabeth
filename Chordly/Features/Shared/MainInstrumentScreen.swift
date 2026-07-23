@@ -250,7 +250,14 @@ struct MainInstrumentScreen: View {
                 .onAppear {
                     chordMode.start()
                     chordMode.setConnected(peer.isConnected)
-                    refreshChordStrum()   // 단독이면 자동 주법이 바로 돌기 시작
+                    // 튜토리얼 "스트로크 체험" 단계: 자동재생을 켜 고른 주법이 계속 돌게 한다.
+                    // (isPlaying 변경이 onChange→refreshAuto로 자동 주법을 켠다. 안 켜면 짚을 때
+                    //  개별 발음만 한 번 나고 스트로크를 체험할 수 없다.)
+                    if tutorial?.shouldAutoPlayStrum == true {
+                        viewModel.isPlaying = true
+                    } else {
+                        refreshChordStrum()   // 단독이면 자동 주법이 바로 돌기 시작
+                    }
                 }
                 // 주법을 새로 고르면 그 주법으로 바로 갈아탄다.
                 .onChange(of: selectedStrumPattern) { _, _ in

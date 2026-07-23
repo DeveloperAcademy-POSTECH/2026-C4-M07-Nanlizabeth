@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 라우터가 가리키는 화면을 그리는 유일한 곳. (ARCHITECTURE §3.9)
 ///
@@ -58,7 +59,8 @@ struct AppRootView: View {
         // (규약: 화면 전환은 반드시 라우터로 — ARCHITECTURE §5)
         .onAppear {
             syncPrototype(to: router.currentRoute)
-            if router.currentRoute != .onboarding { tutorial.startIfNeeded() }
+            updateIdleTimer(for: router.currentRoute)
+            startTutorialIfEligible(on: router.currentRoute)
         }
         .onChange(of: prototypeViewModel.screen) { _, screen in
             switch screen {
@@ -72,16 +74,34 @@ struct AppRootView: View {
         }
         .onChange(of: router.currentRoute) { _, route in
             syncPrototype(to: route)
+            updateIdleTimer(for: route)
             tutorial.handle(.navigated(route))     // 이동 단계 검증(스트로크 선택·스트럼)
-            if route != .onboarding { tutorial.startIfNeeded() }   // 온보딩 마치면 튜토리얼 시작
+            startTutorialIfEligible(on: route)     // 온보딩 마치면 튜토리얼 시작
         }
         // iPad 연결·스트로크 패턴 선택 단계 검증.
         .onChange(of: peerConnect.isConnected) { _, connected in
             if connected { tutorial.handle(.connected) }
         }
+        // 연결된 iPad가 튕기면 → iPhone 튜토리얼 마지막 단계(“iPad로 치기”)를 완료 대기 상태로.
+        .onChange(of: peerConnect.remoteStrumTick) { _, _ in
+            tutorial.handle(.remoteStrummed)
+        }
         .onChange(of: strumSelect.selectedID) { _, id in
             if id != nil { tutorial.handle(.patternSelected) }
         }
+    }
+
+    /// 연주 화면에서는 화면이 꺼지지 않게 한다 — 오토락으로 앱이 백그라운드로 가면
+    /// Multipeer 세션이 끊겨 합주가 중단되기 때문. 연주 화면을 벗어나면 다시 켜 배터리를 아낀다.
+    private func updateIdleTimer(for route: AppRoute) {
+        UIApplication.shared.isIdleTimerDisabled = route.isPerformanceScreen
+    }
+
+    /// 튜토리얼 시작 자격 판정. **iPad는 별도 튜토리얼이 없다** (코드 짚기 0단계가 iPad엔 불가능해
+    /// 영원히 멈춘다) — iPhone에서 온보딩을 마친 뒤에만 시작한다.
+    private func startTutorialIfEligible(on route: AppRoute) {
+        guard route != .onboarding, DeviceInfoProvider.currentDeviceType != .iPad else { return }
+        tutorial.startIfNeeded()
     }
 
     /// 라우터 → 프로토타입 상태. **라우터가 정답이다.**

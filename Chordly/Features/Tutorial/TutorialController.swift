@@ -36,6 +36,7 @@ enum TutorialEvent: Equatable {
     case patternSelected                 // 스트로크 패턴 고름
     case connected                       // iPad와 연결됨
     case strummed                        // 줄을 튕김
+    case remoteStrummed                  // 연결된 iPad가 튕김 (스트로크 햅틱을 받음)
 }
 
 // MARK: - 단계
@@ -58,6 +59,9 @@ struct TutorialStep {
     var targetChord: GuitarChord? = nil
     /// 지금 눌러야 할 화면 컨트롤. 해당 뷰가 라임 펄스로 표시한다.
     var highlightTarget: TutorialHighlightTarget? = nil
+    /// 이 단계에서 넥에 들어오면 **자동재생을 바로 켠다** — 고른 스트로크가 계속 돌며 들리게.
+    /// (안 켜면 짚을 때 개별 발음만 한 번 나고 스트로크를 체험할 수 없다.)
+    var autoPlaysStrum = false
 }
 
 // MARK: - 컨트롤러
@@ -76,6 +80,12 @@ final class TutorialController: ObservableObject {
     let steps: [TutorialStep]
     private let store: TutorialStoreProtocol
 
+    /// 연결 단계 인덱스 (makeSteps 순서 기준). 여기서 **실제로** 연결되면 iPhone에서 직접 긁는
+    /// 5·6단계 대신 "iPad를 들고 치라"는 마지막 단계로 분기한다.
+    private let connectStepIndex = 4
+    /// 실제 연결됐을 때만 닿는 마지막 단계 — 배열 맨 끝에 붙여 순차 진행으로는 오지 않는다.
+    private var remoteStrumStepIndex: Int { steps.count - 1 }
+
     init(store: TutorialStoreProtocol? = nil) {
         // 기본값을 인자 자리에 두면 nonisolated 문맥에서 평가돼 @MainActor와 충돌한다.
         self.store = store ?? TutorialStore()
@@ -85,16 +95,24 @@ final class TutorialController: ObservableObject {
     // MARK: 조회
 
     var currentStep: TutorialStep? { steps.indices.contains(stepIndex) ? steps[stepIndex] : nil }
-    var totalSteps: Int { steps.count }
     var isRunning: Bool { phase == .running }
     var isCelebrating: Bool { phase == .celebrating }
     var isOverlayVisible: Bool { phase == .running || phase == .celebrating }
+
+    /// 대화창 "n / 총" 표시용. 두 경로 길이가 달라서 **밟는 단계 수에 맞춘다** — 배열 인덱스를
+    /// 그대로 쓰면 분기 단계(맨 끝) 때문에 단독 경로가 "7/8"에서 끝나고 연결 경로는 "5/8→8/8"로 튄다.
+    /// 단독(스킵) 경로는 5·6단계까지 7단계, 실제 연결 경로는 5·6을 건너뛰어 6단계.
+    private var isOnRemoteStrumStep: Bool { stepIndex == remoteStrumStepIndex }
+    var displayTotalSteps: Int { isOnRemoteStrumStep ? connectStepIndex + 2 : steps.count - 1 }
+    var displayStepNumber: Int { isOnRemoteStrumStep ? connectStepIndex + 2 : stepIndex + 1 }
 
     /// 지금 넥에 표시할 목표 코드 (진행 중 + 그 단계에 목표가 있을 때).
     var neckTargetChord: GuitarChord? { isRunning ? currentStep?.targetChord : nil }
     var highlightTarget: TutorialHighlightTarget? {
         isRunning ? currentStep?.highlightTarget : nil
     }
+    /// 지금 단계가 넥에서 고른 스트로크를 자동으로 돌려 들려줘야 하는가.
+    var shouldAutoPlayStrum: Bool { isRunning && (currentStep?.autoPlaysStrum ?? false) }
 
     // MARK: 진행
 
@@ -109,6 +127,18 @@ final class TutorialController: ObservableObject {
     /// 실제 화면이 동작을 알려온다. 지금 단계와 맞으면 넘어간다(마지막은 완료 버튼만 켠다).
     func handle(_ event: TutorialEvent) {
         guard phase == .running, let step = currentStep, step.matches(event) else { return }
+        // 연결 단계에서 iPad가 **정말로** 붙으면: 짝이 생겼으니 iPhone에서 스트럼 모드로
+        // 넘어가는 5·6단계는 틀린 안내다. iPad를 들고 함께 치는 마지막 단계로 곧장 분기한다.
+        if case .connected = event, stepIndex == connectStepIndex {
+            jumpToRemoteStrumStep()
+            return
+        }
+        // 합주 마지막 단계에서 짝을 이룬 iPad가 실제로 튕기면 그 자리에서 바로 빵빠레로.
+        // (연결만으로 완료 버튼은 이미 켜져 있어, 이 신호가 안 와도 사용자가 막히지 않는다.)
+        if case .remoteStrummed = event {
+            phase = .celebrating
+            return
+        }
         if step.showsCompleteButton {
             lastActionDone = true          // 완료 버튼 활성화 (자동 진행 안 함)
         } else {
@@ -138,9 +168,20 @@ final class TutorialController: ObservableObject {
         lastActionDone = false
         if stepIndex + 1 < steps.count {
             stepIndex += 1
+            HapticsManager.impact()        // 단계가 넘어갔다는 걸 손끝으로 약하게 알린다.
         } else {
             phase = .celebrating
         }
+    }
+
+    /// 실제 연결 시 마지막 "iPad와 함께 치기" 단계로 건너뛴다. (순차 진행이 아니라 분기)
+    ///
+    /// 연결 자체가 이 단계의 **동작 검증**이라 완료 버튼을 바로 켠다 — 짝이 아직 안 튕겼거나
+    /// 연결이 흔들려도 사용자가 갇히지 않고, iPad가 실제로 튕기면 `handle`에서 곧장 빵빠레로 간다.
+    private func jumpToRemoteStrumStep() {
+        lastActionDone = true
+        stepIndex = remoteStrumStepIndex
+        HapticsManager.impact()            // 분기도 단계 전환이므로 동일하게 약한 피드백.
     }
 
     // MARK: 단계 정의
@@ -171,13 +212,14 @@ final class TutorialController: ObservableObject {
                 highlightTarget: .strumPatternCard
             ),
             TutorialStep(
-                message: "오른쪽 위 체크 버튼으로 돌아가 표시된 코드를 다시 잡아보세요.",
+                message: "오른쪽 위 체크 버튼으로 돌아가 코드를 잡고, 고른 스트로크를 들어보세요.",
                 matches: frettedFirstChord,
                 targetChord: firstChord,
-                highlightTarget: .returnToChord
+                highlightTarget: .returnToChord,
+                autoPlaysStrum: true
             ),
             TutorialStep(
-                message: "아이패드에서 앱 설치 후, 버튼을 눌러 아이패드와 연결해보세요.",
+                message: "아이패드가 있다면 버튼을 눌러 연결해보세요. 없으면 건너뛰어도 괜찮아요.",
                 matches: { if case .connected = $0 { return true }; return false },
                 highlightTarget: .peerButton
             ),
@@ -189,6 +231,14 @@ final class TutorialController: ObservableObject {
             TutorialStep(
                 message: "위아래로 줄을 튕겨 기타를 연주해보세요.",
                 matches: { if case .strummed = $0 { return true }; return false },
+                showsCompleteButton: true
+            ),
+            // 연결됐을 때만 분기로 닿는 마지막 단계 (순차로는 앞 단계에서 celebrating으로 끝나 오지 않는다).
+            // 완료 버튼은 연결과 동시에 켜지고(막힘 방지), 짝을 이룬 iPad가 실제로 튕기면
+            // remoteStrummed로 그 자리에서 바로 축하로 넘어간다.
+            TutorialStep(
+                message: "연결됐어요! 이제 아이패드로 줄을 튕겨 함께 연주해보세요.",
+                matches: { if case .remoteStrummed = $0 { return true }; return false },
                 showsCompleteButton: true
             ),
         ]
