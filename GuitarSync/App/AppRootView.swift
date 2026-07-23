@@ -27,6 +27,9 @@ struct AppRootView: View {
     /// 코드 드릴에서 고른 연습곡. 노래 선택 화면 → 드릴 화면으로 넘겨준다.
     @State private var selectedDrillSong: PracticeSong?
 
+    /// 첫 실행 튜토리얼 — 온보딩 뒤에 실제 화면 위로 대화창을 얹어 단계를 진행한다.
+    @StateObject private var tutorial = TutorialController()
+
     /// iPad **스트럼**만 Figma iPad 4:3 도화지(1366×1024)를 쓴다 — 배경 이미지가 화면을 꽉 채우도록.
     /// 나머지 화면·기기는 기존 iPhone 도화지(874×402) 그대로. (iPad 다른 화면들의 4:3 재배치는 이후 작업)
     private var stageReference: CGSize {
@@ -41,6 +44,11 @@ struct AppRootView: View {
                     .ignoresSafeArea()
 
                 screen
+
+                // 이미 완성된 화면 위에 튜토리얼 대화창을 얹는다. 대화창 밖 터치는 막지 않는다.
+                if tutorial.isOverlayVisible {
+                    TutorialOverlay(tutorial: tutorial)
+                }
             }
         }
         .environmentObject(router)
@@ -48,16 +56,31 @@ struct AppRootView: View {
         // ⚠️ 프로토타입 다리 — 아래 세 개는 U2·U3와 함께 사라진다.
         // 프로토타입 화면은 자체 `screen`·`mode` 값으로 도는데, 라우터가 정답이어야 하므로 이어 붙인다.
         // (규약: 화면 전환은 반드시 라우터로 — ARCHITECTURE §5)
-        .onAppear { syncPrototype(to: router.currentRoute) }
+        .onAppear {
+            syncPrototype(to: router.currentRoute)
+            if router.currentRoute != .onboarding { tutorial.startIfNeeded() }
+        }
         .onChange(of: prototypeViewModel.screen) { _, screen in
             switch screen {
             case .main: break
-            case .strumSelect: router.navigate(to: .strokeSelect)
+            case .strumSelect:
+                router.navigate(to: .strokeSelect)
+                // route onChange 체이닝 타이밍에 의존하지 않도록 튜토리얼에 직접 알린다.
+                tutorial.handle(.navigated(.strokeSelect))
             case .chordProgression: router.navigate(to: .progressionSelect)
             }
         }
         .onChange(of: router.currentRoute) { _, route in
             syncPrototype(to: route)
+            tutorial.handle(.navigated(route))     // 이동 단계 검증(스트로크 선택·스트럼)
+            if route != .onboarding { tutorial.startIfNeeded() }   // 온보딩 마치면 튜토리얼 시작
+        }
+        // iPad 연결·스트로크 패턴 선택 단계 검증.
+        .onChange(of: peerConnect.isConnected) { _, connected in
+            if connected { tutorial.handle(.connected) }
+        }
+        .onChange(of: strumSelect.selectedID) { _, id in
+            if id != nil { tutorial.handle(.patternSelected) }
         }
     }
 
@@ -104,10 +127,14 @@ struct AppRootView: View {
                 // 모드 토글이 **라우터 route까지** 바꾼다 — 그래야 선택·뒤로가기가 그 모드로 돌아온다.
                 onModeChange: { mode in
                     prototypeViewModel.showBPM = false
-                    router.replaceRoot(with: mode == .chord ? .neck : .strum)
+                    let route: AppRoute = mode == .chord ? .neck : .strum
+                    router.replaceRoot(with: route)
+                    tutorial.handle(.navigated(route))   // 튜토리얼: 스트로크 모드 이동 직접 검증
                 },
                 // 넥(모드 A)에서 코드 드릴 연습으로 진입 — 먼저 노래를 고른다.
-                onStartDrill: { router.navigate(to: .chordDrillSongSelect) }
+                onStartDrill: { router.navigate(to: .chordDrillSongSelect) },
+                // 튜토리얼: 넥 목표 코드 표시 + 짚기·튕기기 동작 검증.
+                tutorial: tutorial
             )
 
         case .chordDrillSongSelect:

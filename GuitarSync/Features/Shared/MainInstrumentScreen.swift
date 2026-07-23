@@ -30,10 +30,17 @@ struct MainInstrumentScreen: View {
     /// 코드 드릴 연습으로 진입할 때 (넥 화면에서만 노출). AppRootView가 라우팅한다.
     var onStartDrill: () -> Void = {}
 
+    /// 첫 실행 튜토리얼. 있으면 넥에 목표 코드를 표시하고, 짚기·튕기기 동작을 튜토리얼에 알린다.
+    var tutorial: TutorialController?
+
     /// 이 기기. iPad는 모드 토글을 숨기고 항상 스트로크만 한다.
     var deviceType: DeviceType = DeviceInfoProvider.currentDeviceType
 
     private var isPad: Bool { deviceType == .iPad }
+
+    /// 넥 포지션 컨트롤(슬라이더+A/B)이 놓이는 자리. **가장 낮은 줄(y=372)보다 아래**에 둬서
+    /// 프렛 짚기와 안 겹친다. 이 영역은 넥 터치에서 제외된다.
+    static let neckPositionBarRegion = CGRect(x: 137, y: 373, width: 600, height: 27)
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -142,9 +149,26 @@ struct MainInstrumentScreen: View {
             // 연결되면 자동 스트럼을 멈추고, 운지는 상대(iPad)로 전송돼 거기서 소리가 난다.
             NeckScreen(
                 viewModel: chordMode.neck,
-                onFingeringChanged: { peer.sendFingering($0) }
+                onFingeringChanged: { fingering in
+                    peer.sendFingering(fingering)
+                    tutorial?.handle(.chordFretted(fingering))   // 튜토리얼: 첫 코드 짚기 검증
+                },
+                // 튜토리얼 단계면 목표 코드를 라임 점으로 표시한다.
+                targetFingering: tutorial?.neckTargetChord?.fingering,
+                targetFingers: tutorial?.neckTargetChord?.fingers ?? [],
+                // 넥 아래(줄보다 밑)에 포지션 바를 두고 그 자리는 프렛 짚기로 안 받는다.
+                extraExcludedRegions: [Self.neckPositionBarRegion]
             )
                 .ignoresSafeArea()
+                // 넥을 사운드홀 쪽 높은 프렛으로 옮기는 컨트롤 (슬라이더 ⟷ 모션 A/B).
+                .overlay {
+                    NeckPositionControl(slider: chordMode.sliderPosition)
+                        .frame(
+                            width: Self.neckPositionBarRegion.width,
+                            height: Self.neckPositionBarRegion.height
+                        )
+                        .position(x: Self.neckPositionBarRegion.midX, y: Self.neckPositionBarRegion.midY)
+                }
                 .onAppear {
                     chordMode.start()
                     chordMode.setConnected(peer.isConnected)
@@ -188,8 +212,43 @@ struct MainInstrumentScreen: View {
                 // 내가 튕길 때마다 그 세기를 상대(iPhone)로 보내 거기서 진동이 나게 한다. (모드 C)
                 .onReceive(strumViewModel.strumPerformed) { velocity in
                     peer.sendStrumHaptic(velocity: velocity)
+                    tutorial?.handle(.strummed)   // 튜토리얼: 마지막 단계(줄 튕기기) 검증
                 }
                 .onDisappear { strumProgression.stop() }
         }
+    }
+}
+
+// MARK: - 넥 포지션 컨트롤 (사운드홀 쪽 프렛으로 이동)
+
+/// 넥을 사운드홀 쪽 높은 프렛으로 옮기는 컨트롤 — **슬라이더**로 포지션(1fr…8fr)을 정한다.
+/// (docs/PLAN-neck-position)
+///
+/// - Note: 모션 입력은 아직 불안정해서 **UI에선 숨겼다.** 기능(`MotionNeckPositionProvider`·A/B
+///   전환)은 그대로 남아 있어, 안정화되면 토글만 다시 노출하면 된다.
+private struct NeckPositionControl: View {
+    @ObservedObject var slider: SliderNeckPositionProvider
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // 현재 포지션(프렛) 숫자는 왼쪽(사운드홀 방향)에.
+            Text("\(slider.position + 1)fr")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .frame(width: 36, alignment: .leading)
+            Slider(
+                value: Binding(get: { slider.sliderValue }, set: { slider.sliderValue = $0 }),
+                in: 0...Double(max(slider.maxPosition, 1)),
+                step: 1
+            )
+            .tint(Color.gsAccent)
+            // 넥과 방향을 맞춘다: **오른쪽=너트(1프렛), 왼쪽=사운드홀(높은 프렛)**.
+            // 손잡이가 오른쪽에서 시작해 사운드홀 쪽(왼쪽)으로 움직인다.
+            .scaleEffect(x: -1, y: 1)
+        }
+        .padding(.horizontal, 14)
+        .frame(maxHeight: .infinity)
+        .background(Capsule().fill(Color.black.opacity(0.5)))
     }
 }
