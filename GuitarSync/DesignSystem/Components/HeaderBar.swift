@@ -14,8 +14,8 @@ struct HeaderBar: View {
         ZStack {
             Text(title)
                 .font(.gsHeading)
+                .bold()
                 .foregroundStyle(Color.gsTextPrimary)
-                .underline()
 
             HStack {
                 Button(action: onBack) {

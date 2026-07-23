@@ -156,9 +156,20 @@ enum NeckGeometry {
         return (fretBoundaryXs[fret - 1] + fretBoundaryXs[fret]) / 2
     }
 
-    /// 줄의 굵기. 저음줄일수록 굵다 — 실제 기타와 같다.
+    /// 6번 저음줄부터 1번 고음줄까지의 굵기.
+    static let stringThicknesses: [CGFloat] = [
+        5.0,
+        4.5,
+        4.0,
+        3.2,
+        2.6,
+        2.0,
+    ]
+
+    /// 줄의 굵기. 저음줄에서 고음줄로 갈수록 단계적으로 얇아진다.
     static func stringThickness(_ stringIndex: Int) -> CGFloat {
-        stringIndex < 3 ? 4 : 3
+        guard stringThicknesses.indices.contains(stringIndex) else { return 3 }
+        return stringThicknesses[stringIndex]
     }
 
     // MARK: - 짚은 자리 표식 (원 / 바레 타원)

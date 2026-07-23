@@ -24,6 +24,7 @@ struct NeckScreen: View {
 
     /// 목표 코드의 손가락 번호(줄마다 하나). 있으면 고스트 위에 번호를 함께 안내한다.
     var targetFingers: [Int] = []
+    var excludedHitRegions: [CGRect] = [InstrumentControlHitRegion.topBar]
 
     var body: some View {
         ZStack {
@@ -39,7 +40,7 @@ struct NeckScreen: View {
             // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
             // 지판 밖 터치는 `NeckGeometry.presses(at:majorRadius:)`가 걸러낸다.
             MultiTouchLayer(
-                excludedHitRegions: [InstrumentControlHitRegion.topBar],
+                excludedHitRegions: excludedHitRegions,
                 onSamplesChanged: { samples in
                     let presses = samples.values.flatMap {
                         NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)

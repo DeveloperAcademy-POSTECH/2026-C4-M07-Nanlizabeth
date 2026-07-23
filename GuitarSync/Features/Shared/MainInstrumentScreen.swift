@@ -14,6 +14,7 @@ struct MainInstrumentScreen: View {
 
     /// 모드 B의 자동 왼손 — 고른 코드진행을 BPM에 맞춰 짚어준다. 스트럼 화면이 이 코드로 소리 낸다.
     @StateObject private var strumProgression = ChordProgressionPlayer()
+    @State private var isPeerPopoverPresented = false
 
     /// 스트로크 선택(U4)에서 고른 주법. 재생 시 자동 스트럼이 이걸 긁는다.
     var selectedStrumPattern: StrumPattern?
@@ -52,7 +53,7 @@ struct MainInstrumentScreen: View {
                 // 코드 모드에서만 연결 버튼 왼쪽에 드릴 진입 버튼이 뜬다 (TopControlBar가 모드로 거른다).
                 onStartDrill: isPad ? nil : onStartDrill,
                 onModeChange: onModeChange,
-                onPeer: onPeerConnect,
+                onPeer: togglePeerPopover,
                 onAction: viewModel.openActionScreen,
                 onTogglePlayback: viewModel.togglePlayback,
                 onToggleBPM: { if !viewModel.isPlaying { viewModel.toggleBPM() } },
@@ -63,6 +64,14 @@ struct MainInstrumentScreen: View {
             .padding(.trailing, stageSafeArea.trailing)
             // 기타의 전체 화면 UIKit 멀티터치 레이어보다 항상 위에서 버튼 입력을 받는다.
             .zIndex(10)
+
+            if isPeerPopoverPresented {
+                PeerQuickConnectPopover(viewModel: peer)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, InstrumentControlHitRegion.peerPopover.minX)
+                    .padding(.top, InstrumentControlHitRegion.peerPopover.minY)
+                    .zIndex(12)
+            }
 
             // 재생 중엔 BPM 팝오버를 감춘다 (일시정지 상태에서만 조절 가능).
             if viewModel.showBPM && viewModel.isControlBarExpanded && !viewModel.isPlaying {
@@ -90,6 +99,9 @@ struct MainInstrumentScreen: View {
         .onChange(of: peer.isConnected) { _, connected in
             chordMode.setConnected(connected)
             refreshAuto()
+            if connected {
+                isPeerPopoverPresented = false
+            }
         }
     }
 
@@ -133,6 +145,19 @@ struct MainInstrumentScreen: View {
         peer.isConnected ? .connected : .disconnected
     }
 
+    private var instrumentHitRegions: [CGRect] {
+        isPeerPopoverPresented
+            ? [InstrumentControlHitRegion.topBar, InstrumentControlHitRegion.peerPopover]
+            : [InstrumentControlHitRegion.topBar]
+    }
+
+    private func togglePeerPopover() {
+        isPeerPopoverPresented.toggle()
+        if isPeerPopoverPresented, !peer.isConnected {
+            peer.startBrowsing()
+        }
+    }
+
     @ViewBuilder
     private var instrument: some View {
         switch viewModel.mode {
@@ -142,7 +167,8 @@ struct MainInstrumentScreen: View {
             // 연결되면 자동 스트럼을 멈추고, 운지는 상대(iPad)로 전송돼 거기서 소리가 난다.
             NeckScreen(
                 viewModel: chordMode.neck,
-                onFingeringChanged: { peer.sendFingering($0) }
+                onFingeringChanged: { peer.sendFingering($0) },
+                excludedHitRegions: instrumentHitRegions
             )
                 .ignoresSafeArea()
                 .onAppear {
@@ -161,7 +187,11 @@ struct MainInstrumentScreen: View {
         case .strum:
             // 스트럼 — 단독(모드 B)이거나 연결됨(모드 C). 연결되면 상대(iPhone)가 짚은 운지로 소리 난다.
             // 그리고 내가 튕길 때마다 그 세기를 상대(iPhone)로 보내 거기서 진동이 나게 한다.
-            GuitarStrumView(viewModel: strumViewModel, isPad: isPad)
+            GuitarStrumView(
+                viewModel: strumViewModel,
+                isPad: isPad,
+                excludedHitRegions: instrumentHitRegions
+            )
                 .ignoresSafeArea()
                 .onAppear {
                     // 연결됐으면 상대 운지로, 아니면 고른 진행을 자동으로 돌린다.
