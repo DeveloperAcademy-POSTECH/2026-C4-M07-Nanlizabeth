@@ -6,10 +6,11 @@ import Foundation
 /// `ChordPracticeSession`(엔진·운지·자동 스트럼 조립)과 넥 화면(`NeckViewModel`)을 하나로 잇는다.
 /// **핵심은 넥과 자동 스트럼이 같은 운지상태·같은 엔진을 공유**한다는 것이다:
 ///
-/// - 넥을 짚으면 → **소리 안 남.** 그냥 코드를 잡을 뿐이다 (`.silent`, 2026-07-21 결정)
+/// - **단독 + 자동재생 전**엔 → 짚은 줄이 **바로 소리 난다**(개별 발음). 재생하기 전에도 짚어보며
+///   소리를 들을 수 있게 한 것 (2026-07-23 개선). 재생을 켜면 짚기는 조용해지고 자동 주법이 낸다.
 /// - **자동 스트럼이 BPM대로 계속 긁으며** 그 순간 짚은 운지로 소리 낸다 (스트로크 모드가
-///   진행을 자동으로 돌리는 것과 대칭). 재생 버튼이 아니라 화면에 들어오면 자동으로 돈다
-/// - 줄 떨림·햅틱은 **자동 스트럼**이 낼 때 반응한다 (짚기 자체는 조용하다)
+///   진행을 자동으로 돌리는 것과 대칭). 재생 버튼으로 켠다.
+/// - **연결되면(모드 C)** 짚기는 무음 — 소리는 iPad에서 난다.
 ///
 /// 프로토타입 셸이 넥·스트럼 뷰모델마다 엔진을 따로 만들던 문제(ARCHITECTURE §1)를, 이 컨트롤러는
 /// 엔진 하나만 만들어 해소한다.
@@ -19,6 +20,9 @@ final class ChordModeController: ObservableObject {
     let neck: NeckViewModel
 
     @Published private(set) var isPlaying = false
+
+    /// 상대 기기와 연결됐는가 (모드 C). 연결되면 iPhone 짚기는 무음.
+    private var connected = false
 
     private let session: ChordPracticeSession
 
@@ -46,6 +50,7 @@ final class ChordModeController: ObservableObject {
 
     func start() {
         session.startEngine()
+        updateFrettingSounds()
     }
 
     func end() {
@@ -64,11 +69,19 @@ final class ChordModeController: ObservableObject {
     func play(pattern: StrumPattern, bpm: Double? = nil) {
         session.play(pattern: pattern, bpm: bpm)
         isPlaying = true
+        updateFrettingSounds()   // 재생 중엔 짚기 무음 — 자동 주법이 소리 낸다
     }
 
     func stop() {
         session.stopPlaying()
         isPlaying = false
+        updateFrettingSounds()   // 재생 멈추면 다시 짚는 소리가 나게
+    }
+
+    /// **단독 + 자동재생 꺼짐**일 때만 짚은 줄이 바로 소리 나게 한다.
+    /// 재생 중(자동 주법이 소리)이거나 연결됨(iPad가 소리)이면 짚기는 무음.
+    private func updateFrettingSounds() {
+        session.setFrettingSounds(!isPlaying && !connected)
     }
 
     /// "이 코드를 짚어보세요" 목표를 정한다. 정하면 다른 코드를 짚을 때 진동으로 알려준다 (H3).
@@ -81,10 +94,13 @@ final class ChordModeController: ObservableObject {
     /// 짚기는 어차피 무음(`.silent`)이므로 그대로 두고, 손맛(햅틱)만 끈다(iPad 튕김 신호로 대체).
     /// 연결이 끊기면 화면이 자동 스트럼을 다시 켠다.
     func setConnected(_ connected: Bool) {
+        self.connected = connected
         // 연결되면 짚을 때 진동 안 함 — 손맛은 iPad가 튕길 때 신호로 온다.
         neck.setHapticsEnabled(!connected)
         if connected {
-            stop()
+            stop()   // 자동 주법 정지. stop()이 짚기 소리도 무음으로 갱신한다.
+        } else {
+            updateFrettingSounds()   // 연결 해제 → 단독이면 짚는 소리 복귀
         }
     }
 }
