@@ -123,9 +123,15 @@ final class TutorialController: ObservableObject {
     func handle(_ event: TutorialEvent) {
         guard phase == .running, let step = currentStep, step.matches(event) else { return }
         // 연결 단계에서 iPad가 **정말로** 붙으면: 짝이 생겼으니 iPhone에서 스트럼 모드로
-        // 넘어가는 5·6단계는 틀린 안내다. iPad를 들고 치라는 마지막 단계로 곧장 분기한다.
+        // 넘어가는 5·6단계는 틀린 안내다. iPad를 들고 함께 치는 마지막 단계로 곧장 분기한다.
         if case .connected = event, stepIndex == connectStepIndex {
             jumpToRemoteStrumStep()
+            return
+        }
+        // 합주 마지막 단계에서 짝을 이룬 iPad가 실제로 튕기면 그 자리에서 바로 빵빠레로.
+        // (연결만으로 완료 버튼은 이미 켜져 있어, 이 신호가 안 와도 사용자가 막히지 않는다.)
+        if case .remoteStrummed = event {
+            phase = .celebrating
             return
         }
         if step.showsCompleteButton {
@@ -163,9 +169,12 @@ final class TutorialController: ObservableObject {
         }
     }
 
-    /// 실제 연결 시 마지막 "iPad로 치기" 단계로 건너뛴다. (순차 진행이 아니라 분기)
+    /// 실제 연결 시 마지막 "iPad와 함께 치기" 단계로 건너뛴다. (순차 진행이 아니라 분기)
+    ///
+    /// 연결 자체가 이 단계의 **동작 검증**이라 완료 버튼을 바로 켠다 — 짝이 아직 안 튕겼거나
+    /// 연결이 흔들려도 사용자가 갇히지 않고, iPad가 실제로 튕기면 `handle`에서 곧장 빵빠레로 간다.
     private func jumpToRemoteStrumStep() {
-        lastActionDone = false
+        lastActionDone = true
         stepIndex = remoteStrumStepIndex
         HapticsManager.impact()            // 분기도 단계 전환이므로 동일하게 약한 피드백.
     }
@@ -204,7 +213,7 @@ final class TutorialController: ObservableObject {
                 highlightTarget: .returnToChord
             ),
             TutorialStep(
-                message: "아이패드에서 앱 설치 후, 버튼을 눌러 아이패드와 연결해보세요.",
+                message: "아이패드가 있다면 버튼을 눌러 연결해보세요. 없으면 건너뛰어도 괜찮아요.",
                 matches: { if case .connected = $0 { return true }; return false },
                 highlightTarget: .peerButton
             ),
@@ -219,9 +228,10 @@ final class TutorialController: ObservableObject {
                 showsCompleteButton: true
             ),
             // 연결됐을 때만 분기로 닿는 마지막 단계 (순차로는 앞 단계에서 celebrating으로 끝나 오지 않는다).
-            // iPhone이 아니라 짝을 이룬 iPad가 튕겼다는 신호(remoteStrummed)로만 완료된다.
+            // 완료 버튼은 연결과 동시에 켜지고(막힘 방지), 짝을 이룬 iPad가 실제로 튕기면
+            // remoteStrummed로 그 자리에서 바로 축하로 넘어간다.
             TutorialStep(
-                message: "이제 아이패드를 들고 스트로크를 연주해보세요.",
+                message: "연결됐어요! 이제 아이패드로 줄을 튕겨 함께 연주해보세요.",
                 matches: { if case .remoteStrummed = $0 { return true }; return false },
                 showsCompleteButton: true
             ),
