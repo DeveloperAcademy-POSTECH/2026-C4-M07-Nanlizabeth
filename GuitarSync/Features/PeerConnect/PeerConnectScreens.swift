@@ -21,7 +21,7 @@ struct PeerGuideScreen: View {
                     .foregroundStyle(Color.gsTextSecondary)
                     .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
             }
-            .padding(.horizontal, Spacing.lg)
+            .stageSafeAreaHorizontalPadding(minimum: Spacing.lg)
 
             Spacer()
 
@@ -44,7 +44,7 @@ struct PeerGuideScreen: View {
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
             }
-            .padding(.horizontal, Spacing.xxl)
+            .stageSafeAreaHorizontalPadding(minimum: Spacing.xxl)
 
             Spacer()
 
@@ -97,7 +97,7 @@ struct PeerBrowseScreen: View {
 
             if viewModel.isConnected {
                 connectedCard
-                    .padding(.horizontal, Spacing.xl)
+                    .stageSafeAreaHorizontalPadding(minimum: Spacing.xl)
             }
 
             if viewModel.isInitiator {
@@ -110,7 +110,7 @@ struct PeerBrowseScreen: View {
                         peerList
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Spacing.xl)
+                    .stageSafeAreaHorizontalPadding(minimum: Spacing.xl)
                 }
             } else if !viewModel.isConnected {
                 // 📲 iPad(보조) — 연결 전엔 대기 안내만. 연결되면 위 카드로 충분.

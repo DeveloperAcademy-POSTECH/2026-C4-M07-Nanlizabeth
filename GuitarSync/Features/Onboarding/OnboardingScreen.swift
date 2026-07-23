@@ -22,7 +22,7 @@ struct OnboardingScreen: View {
 
             startButton
         }
-        .padding(.horizontal, Spacing.xxl)
+        .stageSafeAreaHorizontalPadding(minimum: Spacing.xxl)
         .padding(.vertical, Spacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

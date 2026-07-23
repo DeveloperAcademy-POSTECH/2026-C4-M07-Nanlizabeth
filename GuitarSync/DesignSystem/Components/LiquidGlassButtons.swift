@@ -15,7 +15,11 @@ struct LiquidGlassTextButton: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 62, height: 46)
-                .liquidGlassCircle(isActive: false)
+                .background {
+                    Color.clear
+                        .glassEffect(.regular, in: .circle)
+                        .allowsHitTesting(false)
+                }
         }
         .buttonStyle(.plain)
     }
@@ -33,7 +37,16 @@ struct LiquidGlassIconButton: View {
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 46, height: 46)
-                .liquidGlassCircle(isActive: isActive)
+                .background {
+                    Color.clear
+                        .glassEffect(
+                            isActive
+                                ? .regular.tint(Color.gsAccent.opacity(0.28))
+                                : .regular,
+                            in: .circle
+                        )
+                        .allowsHitTesting(false)
+                }
                 .opacity(opacity)
         }
         .buttonStyle(.plain)
@@ -78,27 +91,5 @@ struct PeerLiquidGlassButton: View {
         withAnimation(.easeInOut(duration: 0.58).repeatForever(autoreverses: true)) {
             isBlinking = true
         }
-    }
-}
-
-private extension View {
-    func liquidGlassCircle(isActive: Bool) -> some View {
-        background(
-            Circle()
-                .fill(.ultraThinMaterial)
-                .overlay(Circle().fill(Color.black.opacity(isActive ? 0.18 : 0.42)))
-                .overlay(
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.30), Color.white.opacity(0.05), Color.clear],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                )
-                .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 8)
-        )
-        .overlay(Circle().stroke(Color.white.opacity(isActive ? 0.42 : 0.22), lineWidth: 1))
     }
 }

@@ -4,6 +4,8 @@ import SwiftUI
 ///
 /// - Parameter onConfirm: `nil`이면 확인 버튼을 숨긴다. 확정할 게 없는 화면(기기 찾기 등)용.
 struct HeaderBar: View {
+    @Environment(\.landscapeStageSafeAreaInsets) private var stageSafeArea
+
     let title: String
     let onBack: () -> Void
     var onConfirm: (() -> Void)?
@@ -43,7 +45,8 @@ struct HeaderBar: View {
                     .accessibilityLabel("확정")
                 }
             }
-            .padding(.horizontal, Spacing.xl)
+            .padding(.leading, max(Spacing.xl, stageSafeArea.leading))
+            .padding(.trailing, max(Spacing.xl, stageSafeArea.trailing))
         }
         .frame(height: 86)
     }

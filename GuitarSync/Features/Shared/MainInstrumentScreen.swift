@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MainInstrumentScreen: View {
+    @Environment(\.landscapeStageSafeAreaInsets) private var stageSafeArea
+
     @ObservedObject var viewModel: ScreenshotPrototypeViewModel
     /// 연결·운지 송수신을 담당하는 단일 세션. (모드 C)
     @ObservedObject var peer: PeerConnectViewModel
@@ -36,6 +38,7 @@ struct MainInstrumentScreen: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             instrument
+                .zIndex(0)
 
             TopControlBar(
                 mode: viewModel.mode,
@@ -56,14 +59,17 @@ struct MainInstrumentScreen: View {
                 onToggleControls: viewModel.toggleControls
             )
             .padding(.top, 20)
-            .padding(.leading, 20)
-            .padding(.trailing, 60)
+            .padding(.leading, stageSafeArea.leading)
+            .padding(.trailing, stageSafeArea.trailing)
+            // 기타의 전체 화면 UIKit 멀티터치 레이어보다 항상 위에서 버튼 입력을 받는다.
+            .zIndex(10)
 
             // 재생 중엔 BPM 팝오버를 감춘다 (일시정지 상태에서만 조절 가능).
             if viewModel.showBPM && viewModel.isControlBarExpanded && !viewModel.isPlaying {
                 BPMPopover(bpm: $viewModel.bpm)
                     .padding(.top, 88)
-                    .padding(.trailing, 162)
+                    .padding(.trailing, 100)
+                    .zIndex(11)
             }
 
             #if DEBUG

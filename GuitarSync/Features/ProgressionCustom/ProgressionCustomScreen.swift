@@ -73,7 +73,7 @@ struct ProgressionCustomScreen: View {
                 }
             }
         }
-        .padding(.horizontal, Spacing.xl)
+        .stageSafeAreaHorizontalPadding(minimum: Spacing.xl)
         .padding(.top, Spacing.sm)
     }
 
@@ -116,7 +116,7 @@ struct ProgressionCustomScreen: View {
                     .accessibilityLabel("\(chord.name) 코드 추가")
                 }
             }
-            .padding(.horizontal, Spacing.xl)
+            .stageSafeAreaHorizontalPadding(minimum: Spacing.xl)
             .padding(.top, Spacing.sm)
             .padding(.bottom, Spacing.lg)
         }

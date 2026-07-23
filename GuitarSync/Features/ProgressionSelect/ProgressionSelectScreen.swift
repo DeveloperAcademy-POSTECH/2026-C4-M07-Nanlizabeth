@@ -7,6 +7,8 @@ import SwiftUI
 ///
 /// U4(스트로크 선택)와 짝을 이루는 화면이라 헤더·확정 버튼·선택 반전을 똑같이 쓴다.
 struct ProgressionSelectScreen: View {
+    @Environment(\.landscapeStageSafeAreaInsets) private var stageSafeArea
+
     @ObservedObject var viewModel: ProgressionSelectViewModel
     let onBack: () -> Void
     let onConfirm: () -> Void
@@ -36,7 +38,8 @@ struct ProgressionSelectScreen: View {
                             .padding(.top, Spacing.xs)
                     }
                 }
-                .padding(.horizontal, Spacing.xl)
+                .padding(.leading, max(Spacing.xl, stageSafeArea.leading))
+                .padding(.trailing, max(Spacing.xl, stageSafeArea.trailing))
                 .padding(.top, Spacing.xs)
                 .padding(.bottom, Spacing.lg)
             }
