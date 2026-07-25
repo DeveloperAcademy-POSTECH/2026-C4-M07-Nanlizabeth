@@ -50,11 +50,13 @@ final class ChordDrillSession: ObservableObject {
         self.player = player
         self.coordinator = coordinator
 
-        // ★ 정답일 때만 소리 — 지금 짚은 운지가 목표와 맞을 때만 게이트를 연다.
-        // `ChordJudge.matches`는 짚는 자리만 비교하고 뮤트↔개방은 관대하게 본다 (ChordJudge.swift).
+        // ★ 목표 자리를 대부분 완성하면 소리 — 틀린 프렛이 없는 초보자 보조 기준으로 게이트를 연다.
         coordinator.soundGate = { [weak self] fingering in
             guard let self, let target = self.target else { return true }
-            return ChordJudge.matches(played: fingering.frets, target: target.fingering.frets)
+            return ChordJudge.matchesForAssistedPlayback(
+                played: fingering.frets,
+                target: target.fingering.frets
+            )
         }
 
         // 실제로 울릴 줄은 **목표 코드의 보이싱**으로 정한다 — 안 치는 줄(뮤트 X)은 소리도
@@ -66,10 +68,10 @@ final class ChordDrillSession: ObservableObject {
 
     func startEngine() { engine?.start() }
 
-    /// 자동 피킹을 시작한다. 화면 진입 시 부른다 (모드 A처럼 재생 버튼이 아니라 진입 시 자동으로 돈다).
-    func play(pick: PickPattern, bpm: Double? = nil) {
+    /// 자동 피킹을 시작한다. 코드 드릴에서는 정답 마디마다 한 번씩 재생해 악보 칸과 리듬 시작점을 맞춘다.
+    func play(pick: PickPattern, bpm: Double? = nil, looping: Bool = true) {
         player.bpmOverride = bpm
-        player.play(pick, looping: true)
+        player.play(pick, looping: looping)
     }
 
     func stopPlaying() { player.stop() }

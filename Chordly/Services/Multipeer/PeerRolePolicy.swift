@@ -106,7 +106,7 @@ enum ConnectionFlowState: Equatable {
         switch self {
         case .idle: return "대기"
         case .guide: return "안내"
-        case .browsing: return "기기 찾는 중"
+        case .browsing: return "디바이스 찾는 중"
         case .inviting(let name): return "\(name)에 연결 요청 중"
         case .connected(let name): return "\(name)와 연결됨"
         case .disconnected(let reason): return reason.map { "연결 끊김: \($0)" } ?? "연결 끊김"

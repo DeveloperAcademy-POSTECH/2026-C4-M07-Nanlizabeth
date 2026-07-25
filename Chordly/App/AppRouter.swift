@@ -33,14 +33,14 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
         switch self {
         case .onboarding: return "시작하기"
         case .neck: return "기타넥"
-        case .chordDrillSongSelect: return "노래 선택"
+        case .chordDrillSongSelect: return "노래 목록"
         case .chordDrill: return "코드 드릴"
         case .strum: return "스트럼"
         case .strokeSelect: return "스트로크 선택"
         case .progressionSelect: return "코드진행 선택"
         case .progressionCustom: return "코드진행 만들기"
         case .peerGuide: return "연결 안내"
-        case .peerBrowse: return "기기 찾기"
+        case .peerBrowse: return "디바이스 찾기"
         }
     }
 
@@ -59,7 +59,7 @@ enum AppRoute: Hashable, Identifiable, CaseIterable {
     func isAvailable(on deviceType: DeviceType) -> Bool {
         guard deviceType == .iPad else { return true }
         switch self {
-        case .onboarding, .neck, .chordDrillSongSelect, .chordDrill, .strokeSelect: return false
+        case .onboarding, .neck, .chordDrillSongSelect, .strokeSelect: return false
         default: return true
         }
     }
@@ -172,6 +172,16 @@ final class AppRouter: ObservableObject {
     func completeOnboarding(deviceType: DeviceType = DeviceInfoProvider.currentDeviceType) {
         onboardingStore.markOnboardingCompleted()
         replaceRoot(with: homeRoute)
+    }
+
+    /// 온보딩 마지막 선택에 맞는 첫 튜토리얼 화면으로 보낸다.
+    func completeOnboarding(startingAt route: AppRoute) {
+        guard route.isAvailable(on: deviceType) else {
+            completeOnboarding()
+            return
+        }
+        onboardingStore.markOnboardingCompleted()
+        replaceRoot(with: route)
     }
 
     /// 이 기기의 **메인 연주 화면** — iPad는 스트럼, 그 외는 기타넥. (앱을 켰을 때·연결 후 돌아갈 곳)

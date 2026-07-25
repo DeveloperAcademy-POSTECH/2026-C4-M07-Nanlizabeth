@@ -36,6 +36,10 @@ final class ChordPracticeSession: ObservableObject {
             .merge(with: coordinator.notePlayed)
             .eraseToAnyPublisher()
     }
+    /// 자동 주법의 한 획. 튜토리얼이 정답 코드를 유지한 채 몇 번 연주됐는지 셀 때 쓴다.
+    var strumPerformed: AnyPublisher<StrumPerformedEvent, Never> {
+        player.strumPerformed
+    }
 
     private let engine: GuitarAudioEngineProtocol?
     private let player: StrumPatternPlayer

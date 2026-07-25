@@ -60,7 +60,7 @@ struct PeerGuideScreen: View {
                 }
                 .animation(.snappy, value: viewModel.guideStep)
 
-                Button(viewModel.isLastGuideStep ? "기기 찾기" : "다음") {
+                Button(viewModel.isLastGuideStep ? "디바이스 찾기" : "다음") {
                     if viewModel.isLastGuideStep {
                         finish()
                     } else {
@@ -95,7 +95,7 @@ struct PeerBrowseScreen: View {
 
     var body: some View {
         VStack(spacing: Spacing.md) {
-            HeaderBar(title: "기기 연결", onBack: { router.back() }, onConfirm: nil)
+            HeaderBar(title: "디바이스 연결", onBack: { router.back() }, onConfirm: nil)
 
             if viewModel.isConnected {
                 connectedCard
@@ -106,7 +106,7 @@ struct PeerBrowseScreen: View {
                 // 📱 iPhone(연결 주체) — 찾은 기기 목록을 (연결 중에도) 보여준다.
                 ScrollView {
                     VStack(alignment: .leading, spacing: Spacing.sm) {
-                        Text(viewModel.isConnected ? "다른 근처 기기" : "근처 기기")
+                        Text(viewModel.isConnected ? "다른 근처 디바이스" : "근처 디바이스")
                             .font(.gsCaption)
                             .foregroundStyle(Color.gsTextTertiary)
                         peerList
@@ -187,7 +187,7 @@ struct PeerBrowseScreen: View {
             Text("연결을 기다리는 중…")
                 .font(.gsBody)
                 .foregroundStyle(Color.gsTextSecondary)
-            Text("상대 iPhone에서 이 기기를 선택하면 연결됩니다")
+            Text("상대 iPhone에서 이 디바이스를 선택하면 연결됩니다")
                 .font(.gsCaption)
                 .foregroundStyle(Color.gsTextTertiary)
         }
@@ -198,7 +198,7 @@ struct PeerBrowseScreen: View {
         if viewModel.discoveredPeers.isEmpty {
             HStack(spacing: Spacing.xs) {
                 ProgressView().tint(Color.gsTextSecondary)
-                Text("근처 기기를 찾는 중…")
+                Text("근처 디바이스를 찾는 중…")
                     .font(.gsSubheadline)
                     .foregroundStyle(Color.gsTextSecondary)
             }

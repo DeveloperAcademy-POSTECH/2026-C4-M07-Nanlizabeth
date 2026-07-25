@@ -2,6 +2,10 @@ import SwiftUI
 
 struct BPMPopover: View {
     @Binding var bpm: Double
+    var arrowOffsetX: CGFloat = 0
+    var highlightsNumber = false
+    var onCommit: (Double) -> Void = { _ in }
+    var onDismiss: () -> Void = {}
 
     /// 숫자를 탭하면 **앱 내부 숫자패드**로 직접 입력하는 모드가 된다.
     @State private var isEditing = false
@@ -29,7 +33,7 @@ struct BPMPopover: View {
                 BPMKeypad(
                     onDigit: appendDigit,
                     onDelete: deleteLast,
-                    onDone: commit
+                    onDone: commitAndDismiss
                 )
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -47,7 +51,7 @@ struct BPMPopover: View {
             Triangle()
                 .fill(Color(red: 0.30, green: 0.34, blue: 0.42).opacity(0.95))
                 .frame(width: 24, height: 14)
-                .offset(y: -12)
+                .offset(x: arrowOffsetX, y: -12)
         }
         .animation(.easeOut(duration: 0.16), value: isEditing)
     }
@@ -64,6 +68,7 @@ struct BPMPopover: View {
                     .frame(height: 1)
             }
             .contentShape(Rectangle())
+            .tutorialPulseHighlight(highlightsNumber, cornerRadius: 8)
             .onTapGesture {
                 if isEditing {
                     commit()
@@ -100,6 +105,13 @@ struct BPMPopover: View {
         }
         editText = ""
         isEditing = false
+    }
+
+    /// 숫자패드의 완료는 입력 확정과 동시에 BPM 팝오버 전체를 닫는다.
+    private func commitAndDismiss() {
+        commit()
+        onCommit(bpm)
+        onDismiss()
     }
 }
 

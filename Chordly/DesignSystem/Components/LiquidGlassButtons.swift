@@ -14,7 +14,7 @@ struct LiquidGlassTextButton: View {
             Text(title)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 62, height: 46)
+                .frame(width: 46, height: 46)
                 .background {
                     Color.clear
                         .glassEffect(.regular, in: .circle)
@@ -48,6 +48,31 @@ struct LiquidGlassIconButton: View {
     }
 }
 
+struct LiquidGlassGlyphButton: View {
+    let glyph: String
+    let action: () -> Void
+
+    init(_ glyph: String, action: @escaping () -> Void) {
+        self.glyph = glyph
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(glyph)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 46, height: 46)
+                .background {
+                    Color.clear
+                        .glassEffect(.regular, in: .circle)
+                        .allowsHitTesting(false)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// 컨트롤 바의 펼치기·숨기기 전용 버튼.
 /// 일반 원형 버튼보다 가로폭이 좁아 다른 액션 버튼과 성격을 구분한다.
 struct LiquidGlassCompactToggleButton: View {
@@ -72,7 +97,7 @@ struct LiquidGlassCompactToggleButton: View {
 }
 
 /// 커스텀 SVG 에셋을 표시하는 Liquid Glass 버튼.
-/// 기존 C/S 텍스트 버튼과 같은 62×46 프레임을 유지한다.
+/// 다른 원형 액션 버튼과 같은 46×46 프레임을 유지해 상단바 간격을 맞춘다.
 struct LiquidGlassAssetIconButton: View {
     let assetName: String
     let action: () -> Void
@@ -85,7 +110,7 @@ struct LiquidGlassAssetIconButton: View {
                 .scaledToFit()
                 .foregroundStyle(.white)
                 .frame(width: 26, height: 28)
-                .frame(width: 62, height: 46)
+                .frame(width: 46, height: 46)
                 .background {
                     Color.clear
                         .glassEffect(.regular, in: .circle)

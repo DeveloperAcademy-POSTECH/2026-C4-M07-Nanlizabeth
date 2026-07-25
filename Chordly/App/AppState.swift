@@ -58,6 +58,12 @@ final class AppState: ObservableObject {
                 receivedFrets = GuitarFingering(frets: frets).frets
             }
             receivedChord = message.chord
+        case .connectionIdentity:
+            // 연결 역할 협상은 PeerConnectViewModel이 처리한다.
+            break
+        case .songSelection, .songProgress:
+            // 연결 곡 동기화는 PeerConnectViewModel이 처리한다.
+            break
         case .strumHaptic:
             // 진동 신호 — 이 레거시 상태 저장소에서는 다루지 않는다 (PeerConnectViewModel이 처리).
             break

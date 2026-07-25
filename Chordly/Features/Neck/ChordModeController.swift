@@ -24,6 +24,9 @@ final class ChordModeController: ObservableObject {
     let neck: NeckViewModel
 
     @Published private(set) var isPlaying = false
+    var strumPerformed: AnyPublisher<StrumPerformedEvent, Never> {
+        session.strumPerformed
+    }
 
     /// 상대 기기와 연결됐는가 (모드 C). 연결되면 iPhone 짚기는 무음.
     private var connected = false

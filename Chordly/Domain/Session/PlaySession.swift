@@ -173,8 +173,13 @@ final class PlaySessionCoordinator: ObservableObject {
         // 게이트가 닫혀 있으면 이 획은 통째로 무음 — 소리도, 줄 떨림·햅틱 방송도 없다.
         guard soundGate?(played) ?? true else { return }
         // 판정은 짚은 운지로, 실제 울림은 보이싱으로 — 안 치는 줄(뮤트)은 여기서 빠진다.
-        let fingering = voicingOverride?() ?? played
+        let fingering = soundingVoicing(for: played)
         lastPlayedFingering = fingering
+
+        if occurrence.isMute {
+            handleMutedStrum(occurrence, fingering: fingering)
+            return
+        }
 
         audioEngine?.strum(
             frets: fingering.frets,
@@ -183,8 +188,6 @@ final class PlaySessionCoordinator: ObservableObject {
             interval: occurrence.interval
         )
 
-        // 뮤트 스트로크는 소리가 거의 안 나므로 시각·햅틱 피드백도 약하게.
-        let feedbackVelocity = occurrence.isMute ? occurrence.velocity / 2 : occurrence.velocity
         let order = occurrence.direction == .down
             ? Array(0..<GuitarFingering.stringCount)
             : Array((0..<GuitarFingering.stringCount).reversed())
@@ -194,7 +197,37 @@ final class PlaySessionCoordinator: ObservableObject {
                 NotePlayedEvent(
                     stringIndex: stringIndex,
                     fret: fingering.frets[stringIndex],
-                    velocity: feedbackVelocity
+                    velocity: occurrence.velocity
+                )
+            )
+        }
+    }
+
+    private func handleMutedStrum(_ occurrence: StrumOccurrence, fingering: GuitarFingering) {
+        audioEngine?.stopAllStrings()
+        audioEngine?.strum(
+            frets: fingering.frets,
+            direction: occurrence.direction,
+            velocity: min(occurrence.velocity, 68),
+            interval: min(occurrence.interval, 0.008)
+        )
+
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(0.055))
+            guard let self else { return }
+            self.audioEngine?.stopAllStrings()
+        }
+
+        let order = occurrence.direction == .down
+            ? Array(0..<GuitarFingering.stringCount)
+            : Array((0..<GuitarFingering.stringCount).reversed())
+
+        for stringIndex in order where fingering.isAudible(stringIndex: stringIndex) {
+            notePlayedSubject.send(
+                NotePlayedEvent(
+                    stringIndex: stringIndex,
+                    fret: fingering.frets[stringIndex],
+                    velocity: occurrence.velocity / 2
                 )
             )
         }
@@ -203,7 +236,7 @@ final class PlaySessionCoordinator: ObservableObject {
     private func handlePluck(_ occurrence: PluckOccurrence) {
         let played = fingeringSource?.currentFingering ?? .open
         guard soundGate?(played) ?? true else { return }
-        let fingering = voicingOverride?() ?? played
+        let fingering = soundingVoicing(for: played)
 
         // 음수 줄 번호는 "베이스" 신호 — 그 코드의 가장 낮은 울리는 줄로 푼다 (코드마다 다르므로).
         let stringIndex = occurrence.stringIndex >= 0
@@ -227,5 +260,11 @@ final class PlaySessionCoordinator: ObservableObject {
                 velocity: occurrence.velocity
             )
         )
+    }
+
+    private func soundingVoicing(for played: GuitarFingering) -> GuitarFingering {
+        voicingOverride?()
+            ?? ChordVoicingResolver.resolvedVoicing(for: played)
+            ?? played
     }
 }
