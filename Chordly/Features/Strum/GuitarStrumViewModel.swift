@@ -16,6 +16,8 @@ final class GuitarStrumViewModel: ObservableObject {
     /// 줄을 튕길 때마다 세기(0~127)를 방송한다. **모드 C에서 iPad가 이걸 iPhone으로 보내
     /// 진동을 일으킨다** — 손맛은 실제로 줄이 튕기는 이쪽(오른손)에서 생기기 때문.
     let strumPerformed = PassthroughSubject<UInt8, Never>()
+    /// 드릴 UI가 "정확히 어떤 입력이 들어왔는지" 판정할 수 있게 내보내는 이벤트.
+    let strumInputPerformed = PassthroughSubject<StrumInputEvent, Never>()
 
     /// 손가락별 흔적.
     ///
@@ -86,7 +88,12 @@ final class GuitarStrumViewModel: ObservableObject {
     }
 
     func updateFingering(_ frets: [Int]) {
-        currentFingering = GuitarFingering(frets: frets)
+        let nextFingering = GuitarFingering(frets: frets)
+        for stringIndex in 0..<GuitarFingering.stringCount
+        where nextFingering.fret(for: stringIndex) ?? -1 < 0 {
+            audioEngine.stopString(stringIndex: stringIndex)
+        }
+        currentFingering = nextFingering
     }
 
     func pluckString(_ stringIndex: Int, velocity: UInt8 = 96) {
@@ -103,6 +110,7 @@ final class GuitarStrumViewModel: ObservableObject {
     /// 손가락마다 따로 처리하므로 아르페지오(여러 줄을 각자 튕기기)와 화음(동시에 긁기)이
     /// 둘 다 된다.
     func handleTouchesChanged(_ touches: [TouchID: CGPoint], band: CGRect) {
+        let hadTracks = !tracks.isEmpty
         // 뗀 손가락의 흔적부터 지운다.
         tracks = tracks.filter { touches.keys.contains($0.key) }
 
@@ -113,6 +121,9 @@ final class GuitarStrumViewModel: ObservableObject {
         }
 
         debugState.activeTouchCount = touches.count
+        if touches.isEmpty, hadTracks {
+            strumInputPerformed.send(.ended)
+        }
     }
 
     /// 화면을 벗어나는 등, 손을 다 뗀 것으로 쳐야 할 때.
@@ -135,12 +146,15 @@ final class GuitarStrumViewModel: ObservableObject {
                 startAxisValue: currentAxisValue,
                 previousAxisValue: currentAxisValue,
                 previousTime: time,
-                previousStringIndex: currentStringIndex
+                previousStringIndex: currentStringIndex,
+                minStringIndex: currentStringIndex,
+                maxStringIndex: currentStringIndex
             )
 
             if let currentStringIndex {
                 pluckString(currentStringIndex, velocity: Self.firstContactVelocity)
                 strumPerformed.send(Self.firstContactVelocity)
+                strumInputPerformed.send(.pluck(stringIndex: currentStringIndex))
             }
 
             updateDebugState(track: tracks[id], axisValue: currentAxisValue, stringIndex: currentStringIndex)
@@ -149,14 +163,23 @@ final class GuitarStrumViewModel: ObservableObject {
 
         if let currentStringIndex {
             let dynamics = strumDynamics(track: track, currentAxisValue: currentAxisValue, currentTime: time)
+            let enteredFromOutside = track.previousStringIndex == nil
             playCrossedStrings(
                 from: track.previousStringIndex,
                 to: currentStringIndex,
                 dynamics: dynamics
             )
+            if enteredFromOutside {
+                strumInputPerformed.send(.pluck(stringIndex: currentStringIndex))
+            }
             if track.previousStringIndex != currentStringIndex {
                 strumPerformed.send(dynamics.velocity)
             }
+            emitWideStrumIfNeeded(
+                track: &track,
+                currentAxisValue: currentAxisValue,
+                currentStringIndex: currentStringIndex
+            )
             track.previousStringIndex = currentStringIndex
         }
 
@@ -240,6 +263,38 @@ final class GuitarStrumViewModel: ObservableObject {
 
         return StrumDynamics(velocity: velocity, interval: interval)
     }
+
+    private func emitWideStrumIfNeeded(
+        track: inout StrumTouchTrack,
+        currentAxisValue: CGFloat,
+        currentStringIndex: Int
+    ) {
+        track.minStringIndex = min(track.minStringIndex ?? currentStringIndex, currentStringIndex)
+        track.maxStringIndex = max(track.maxStringIndex ?? currentStringIndex, currentStringIndex)
+
+        guard !track.hasEmittedWideStrum,
+              let minStringIndex = track.minStringIndex,
+              let maxStringIndex = track.maxStringIndex,
+              maxStringIndex - minStringIndex >= layoutConfiguration.stringCount - 1
+        else { return }
+
+        track.hasEmittedWideStrum = true
+        strumInputPerformed.send(
+            .strum(
+                from: minStringIndex,
+                to: maxStringIndex,
+                direction: directionMapping.direction(
+                    for: rawDirection(from: track.startAxisValue, to: currentAxisValue) ?? .forward
+                )
+            )
+        )
+    }
+}
+
+enum StrumInputEvent: Equatable {
+    case pluck(stringIndex: Int)
+    case strum(from: Int, to: Int, direction: StrumDirection)
+    case ended
 }
 
 struct GuitarStrumDebugState: Equatable {
@@ -262,6 +317,9 @@ private struct StrumTouchTrack {
     var previousTime: TimeInterval
     /// 직전에 이 손가락이 올라가 있던 줄. 여기서 지금 줄까지가 "지나온 줄"이다.
     var previousStringIndex: Int?
+    var minStringIndex: Int?
+    var maxStringIndex: Int?
+    var hasEmittedWideStrum = false
 }
 
 private struct StrumDynamics {

@@ -15,15 +15,23 @@ final class PeerConnectViewModel: ObservableObject {
     @Published private(set) var receivedFingering: GuitarFingering = .open
     /// 연결된 상대 이름 (피드백 표시용).
     @Published private(set) var connectedPeerName: String?
+    @Published private(set) var localDisplayName: String = PeerDisplayNameStore.currentName
 
     /// 상대(iPad)가 튕길 때마다 오른다 — 튜토리얼이 "짝이 실제로 연주했다"를 감지하는 신호.
     @Published private(set) var remoteStrumTick: Int = 0
+    /// 수신 측이 아직 수락하거나 거절하지 않은 연결 요청.
+    @Published private(set) var pendingInvitationPeerName: String?
+    /// 연결 합주에서 양쪽이 함께 보고 있는 곡과 진행 스텝.
+    @Published private(set) var sharedSongTitle: String?
+    @Published private(set) var sharedSongStep: Int = 0
+    @Published private(set) var sharedSongSelectionTick: Int = 0
 
-    /// 이 기기가 맡는 손. 협상 없이 기기 종류로 정해진다.
-    let role: PeerHandRole
+    /// 연결 전에는 디바이스 기본 역할, 연결 후에는 초대 방향과 iPad 우선 규칙으로 확정된 역할.
+    @Published private(set) var role: PeerHandRole
 
-    /// **연결의 주체는 항상 iPhone(코드 쪽).** iPhone이 찾아 나서고(browse), iPad는 기다린다(advertise).
-    var isInitiator: Bool { role == .fingering }
+    /// 연결 전에는 양쪽 모두 검색할 수 있고, 연결 후에는 실제로 상대를 선택한 쪽만 주체다.
+    var isInitiator: Bool { !isConnected || didSelectPeer }
+    var isConnectionRequester: Bool { isConnected && didSelectPeer }
 
     /// 마지막으로 보낸 운지 — 같은 값을 반복 전송하지 않으려고 기억한다.
     private var lastSentFingering: GuitarFingering?
@@ -34,21 +42,24 @@ final class PeerConnectViewModel: ObservableObject {
     private var pendingStrumVelocity: UInt8 = 0
     private var strumSendTask: Task<Void, Never>?
 
-    private let service: MultipeerServiceProtocol
+    private var service: MultipeerServiceProtocol
     private let guideStore: PeerGuideStoreProtocol
+    private let localDeviceType: DeviceType
+    private var didSelectPeer = false
 
     init(
         deviceType: DeviceType = DeviceInfoProvider.currentDeviceType,
         service: MultipeerServiceProtocol? = nil,
         guideStore: PeerGuideStoreProtocol? = nil
     ) {
+        self.localDeviceType = deviceType
         self.role = PeerRolePolicy.role(for: deviceType)
-        self.service = service ?? Self.defaultService()
+        self.service = service ?? Self.defaultService(displayName: PeerDisplayNameStore.currentName)
         self.guideStore = guideStore ?? PeerGuideStore()
         bind()
     }
 
-    private static func defaultService() -> MultipeerServiceProtocol {
+    private static func defaultService(displayName: String) -> MultipeerServiceProtocol {
         #if DEBUG
         // 시뮬레이터엔 붙을 상대가 없어 목록·연결됨 상태를 볼 수 없다.
         // 실행 인자 `-mockPeers YES`를 주면 가짜 기기가 나타나 화면 개발·검증이 가능하다.
@@ -56,7 +67,7 @@ final class PeerConnectViewModel: ObservableObject {
             return MockMultipeerService()
         }
         #endif
-        return MultipeerService()
+        return MultipeerService(displayName: displayName)
     }
 
     /// 상대 기기가 맡는 손 (안내 문구용).
@@ -65,6 +76,7 @@ final class PeerConnectViewModel: ObservableObject {
     }
 
     var isConnected: Bool { flowState.isConnected }
+    var hasCustomDisplayName: Bool { PeerDisplayNameStore.savedName != nil }
 
     /// 가이드를 이미 봤는가 — 연결 버튼이 어디로 갈지 정한다.
     var shouldShowGuide: Bool { !guideStore.hasSeenGuide }
@@ -88,26 +100,60 @@ final class PeerConnectViewModel: ObservableObject {
 
     // MARK: - 탐색·연결
 
-    /// 연결을 시작한다. **역할에 따라 주체가 다르다:**
-    /// - iPhone(코드) = 찾아 나선다 (browse) → 발견한 iPad를 초대
-    /// - iPad(스트로크) = 기다린다 (advertise) → iPhone의 초대를 받는다
+    /// 저장된 이름으로 멀티피어 세션을 새로 만들어 다른 기기의 검색 목록에 그대로 노출한다.
+    @discardableResult
+    func setDisplayName(_ name: String) -> Bool {
+        guard let saved = PeerDisplayNameStore.save(name) else { return false }
+        service.disconnect()
+        service = Self.defaultService(displayName: saved)
+        localDisplayName = saved
+        flowState = .idle
+        discoveredPeers = []
+        connectedPeerName = nil
+        bind()
+        return true
+    }
+
+    /// 연결을 시작한다. iPhone과 iPad 모두 주변 디바이스를 찾고 동시에 자신을 노출한다.
     func startBrowsing() {
+        didSelectPeer = false
         flowState = .browsing
-        if isInitiator {
-            service.startBrowsing()
-        } else {
-            service.startAdvertising()
-        }
+        service.startAdvertising()
+        service.startBrowsing()
     }
 
     func invite(_ peerName: String) {
+        didSelectPeer = true
         flowState = .inviting(peerName: peerName)
         service.invitePeer(named: peerName)
     }
 
+    func respondToInvitation(accept: Bool) {
+        guard pendingInvitationPeerName != nil else { return }
+        pendingInvitationPeerName = nil
+        didSelectPeer = false
+        service.respondToInvitation(accept: accept)
+    }
+
+    /// 곡 선택 권한은 연결을 요청해 코드 역할을 맡은 디바이스에만 있다.
+    func selectSharedSong(title: String) {
+        guard isConnected, role == .fingering else { return }
+        sharedSongTitle = title
+        sharedSongStep = 0
+        sharedSongSelectionTick &+= 1
+        service.send(.songSelection(title: title))
+    }
+
+    /// 실제 스트로크가 진행된 순서를 코드 담당에게 보낸다.
+    func sendSharedSongProgress(step: Int) {
+        guard isConnected, role == .strumming else { return }
+        sharedSongStep = max(0, step)
+        service.send(.songProgress(step: sharedSongStep))
+    }
+
     /// 내 운지를 상대에게 보낸다. **모드 C의 iPhone(짚기 담당).** 같은 운지는 다시 안 보낸다.
     func sendFingering(_ fingering: GuitarFingering) {
-        guard isConnected, fingering != lastSentFingering else { return }
+        guard isConnected, role == .fingering, fingering != lastSentFingering else { return }
         lastSentFingering = fingering
         service.send(.fingering(fingering.frets))
     }
@@ -115,7 +161,7 @@ final class PeerConnectViewModel: ObservableObject {
     /// 내가 튕겼다는 걸 상대(iPhone)에게 알려 **거기서 진동**하게 한다. **모드 C의 iPad(긁기 담당).**
     /// 한 번 긁으면 여러 줄이 몰아치므로 30ms 창에서 가장 센 것 하나로 합쳐 보낸다.
     func sendStrumHaptic(velocity: UInt8) {
-        guard isConnected else { return }
+        guard isConnected, role == .strumming else { return }
         pendingStrumVelocity = max(pendingStrumVelocity, velocity)
         guard strumSendTask == nil else { return }
         strumSendTask = Task { [weak self] in
@@ -137,23 +183,43 @@ final class PeerConnectViewModel: ObservableObject {
         service.disconnect()
         flowState = .idle
         discoveredPeers = []
+        didSelectPeer = false
+        pendingInvitationPeerName = nil
+        sharedSongTitle = nil
+        sharedSongStep = 0
+        role = PeerRolePolicy.role(for: localDeviceType)
     }
 
     private func bind() {
         service.onDiscoveredPeersChanged = { [weak self] peers in
             self?.discoveredPeers = peers
         }
+        service.onInvitationReceived = { [weak self] peerName in
+            self?.didSelectPeer = false
+            self?.pendingInvitationPeerName = peerName
+        }
         service.onConnectedPeersChanged = { [weak self] peers in
             guard let self else { return }
             if let first = peers.first {
                 self.connectedPeerName = first
                 self.flowState = .connected(peerName: first)
+                self.service.send(
+                    .connectionIdentity(
+                        deviceType: self.localDeviceType,
+                        didSelectPeer: self.didSelectPeer
+                    )
+                )
             } else {
+                let wasConnected = self.flowState.isConnected
                 self.connectedPeerName = nil
                 self.lastSentFingering = nil
                 self.receivedFingering = .open
-                if self.flowState.isConnected {
+                if wasConnected {
                     self.flowState = .disconnected(reason: nil)
+                    self.didSelectPeer = false
+                    self.sharedSongTitle = nil
+                    self.sharedSongStep = 0
+                    self.role = PeerRolePolicy.role(for: self.localDeviceType)
                 }
             }
         }
@@ -166,21 +232,63 @@ final class PeerConnectViewModel: ObservableObject {
         service.onMessageReceived = { [weak self] message, _ in
             guard let self else { return }
             switch message.type {
+            case .connectionIdentity:
+                let remoteDeviceType = message.text.flatMap(DeviceType.init(rawValue:)) ?? .unknown
+                let remoteDidSelectPeer = message.number == 1
+                self.resolveRole(
+                    remoteDeviceType: remoteDeviceType,
+                    remoteDidSelectPeer: remoteDidSelectPeer
+                )
+            case .songSelection:
+                if self.role == .strumming, let title = message.text {
+                    self.sharedSongTitle = title
+                    self.sharedSongStep = 0
+                    self.sharedSongSelectionTick &+= 1
+                }
+            case .songProgress:
+                if self.role == .fingering, let step = message.number {
+                    self.sharedSongStep = max(0, step)
+                }
             case .fingering:
                 // 상대(iPhone)가 짚은 운지 → iPad가 이걸로 소리 낸다.
-                if let frets = message.frets {
+                if self.role == .strumming, let frets = message.frets {
                     self.receivedFingering = GuitarFingering(frets: frets)
                 }
             case .strumHaptic:
                 // 상대(iPad)가 튕겼다 → iPhone이 그 세기로 진동. 손맛이 여기서 난다.
-                if let velocity = message.number {
+                if self.role == .fingering, let velocity = message.number {
                     self.strumHaptics.pluck(velocity: UInt8(clamping: velocity))
+                    self.remoteStrumTick += 1
                 }
-                self.remoteStrumTick += 1   // 튜토리얼 마지막 단계 검증용 신호.
             default:
                 break
             }
         }
+    }
+
+    private func resolveRole(
+        remoteDeviceType: DeviceType,
+        remoteDidSelectPeer: Bool
+    ) {
+        if localDeviceType == .iPad, remoteDeviceType == .iPhone {
+            role = .strumming
+            return
+        }
+        if localDeviceType == .iPhone, remoteDeviceType == .iPad {
+            role = .fingering
+            return
+        }
+
+        if didSelectPeer != remoteDidSelectPeer {
+            role = didSelectPeer ? .fingering : .strumming
+            return
+        }
+
+        // 양쪽이 동시에 눌렀을 때도 서로 반대 역할을 고르도록 이름으로 안정적인 타이브레이크를 둔다.
+        let remoteName = connectedPeerName ?? ""
+        role = localDisplayName.localizedStandardCompare(remoteName) == .orderedAscending
+            ? .fingering
+            : .strumming
     }
 }
 
@@ -199,19 +307,19 @@ struct PeerGuideStep: Identifiable, Equatable {
         [
             PeerGuideStep(
                 id: 0,
-                title: "두 기기가 한 대의 기타가 됩니다",
-                body: "이 기기는 \(myRole.displayName)을 맡습니다.\n상대 기기가 \(partnerRole.displayName)을 맡아요."
+                title: "두 디바이스가 한 대의 기타가 됩니다",
+                body: "이 디바이스는 \(myRole.displayName)을 맡습니다.\n상대 디바이스가 \(partnerRole.displayName)을 맡아요."
             ),
             PeerGuideStep(
                 id: 1,
-                title: "두 기기 모두 이 화면을 열어주세요",
+                title: "두 디바이스 모두 이 화면을 열어주세요",
                 body: "같은 Wi-Fi에 있으면 가장 잘 찾습니다.\nWi-Fi가 없어도 블루투스로 연결됩니다."
             ),
             PeerGuideStep(
                 id: 2,
                 title: "허용 팝업이 뜨면 눌러주세요",
                 body: "처음 연결할 때 iOS가 '로컬 네트워크' 허용을 묻습니다.\n"
-                    + "이 팝업은 화면과 방향이 다르게 보일 수 있어요 — 기기를 세워서 확인하세요.",
+                    + "이 팝업은 화면과 방향이 다르게 보일 수 있어요. 디바이스를 세워서 확인하세요.",
                 warnsPermission: true
             ),
         ]
@@ -232,6 +340,7 @@ final class MockMultipeerService: MultipeerServiceProtocol {
     var onConnectedPeersChanged: (([String]) -> Void)?
     var onConnectionStateChanged: ((PeerConnectionState) -> Void)?
     var onMessageReceived: ((PeerMessage, String) -> Void)?
+    var onInvitationReceived: ((String) -> Void)?
     var onLog: ((String) -> Void)?
 
     /// 초대 후 연결되기까지 걸리는 척하는 시간.
@@ -251,6 +360,8 @@ final class MockMultipeerService: MultipeerServiceProtocol {
         discoveredPeers = []
         onDiscoveredPeersChanged?(discoveredPeers)
     }
+
+    func respondToInvitation(accept: Bool) {}
 
     func disconnect() {
         connectedPeers = []

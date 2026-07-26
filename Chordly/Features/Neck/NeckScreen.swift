@@ -24,16 +24,35 @@ struct NeckScreen: View {
 
     /// 목표 코드의 손가락 번호(줄마다 하나). 있으면 고스트 위에 번호를 함께 안내한다.
     var targetFingers: [Int] = []
+    /// 드릴처럼 위쪽에서 내려다보며 읽는 화면에서 안내 표시만 뒤집기 위한 회전값.
+    var targetGuideRotationDegrees: Double = 0
     var excludedHitRegions: [CGRect] = [InstrumentControlHitRegion.topBar]
 
     /// 넥 위에 얹은 컨트롤(포지션 바 등)의 영역 — 이 안의 터치는 프렛 짚기로 안 받는다.
     /// 자유연주(모드 A)가 포지션 슬라이더 자리를 넣는다. 드릴은 비운다.
     var extraExcludedRegions: [CGRect] = []
+    /// 손이 작은 사용자를 위해 현과 프렛의 상하좌우 간격을 함께 줄인다.
+    var usesCompactLayout = false
 
     var body: some View {
         ZStack {
-            // 포지션에 따라 배경을 바꾼다: **1프렛(포지션 0)일 땐 너트 끝이 두꺼운 이미지**로
-            // "넥의 끝"임을 보이고, 사운드홀 쪽으로 옮기면(포지션>0) 너트 없는 이미지로 갈아끼운다.
+            neckContent
+                .scaleEffect(usesCompactLayout ? 0.88 : 1, anchor: .center)
+        }
+        .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
+        .animation(.easeOut(duration: 0.18), value: usesCompactLayout)
+        .onChange(of: viewModel.fingering) { _, fingering in
+            onFingeringChanged?(fingering)
+        }
+        .onDisappear {
+            // 화면을 벗어나면 짚고 있던 것으로 남지 않게 한다.
+            viewModel.releaseAll()
+        }
+    }
+
+    private var neckContent: some View {
+        ZStack {
+            // 배경과 터치 좌표계를 함께 축소해 보이는 프렛과 실제 음정이 어긋나지 않게 한다.
             Image(viewModel.fretOffset == 0 ? "iPhoneNeckBackground" : "iPhoneNeckBackgroundShifted")
                 .resizable()
                 .scaledToFill()
@@ -45,26 +64,37 @@ struct NeckScreen: View {
             pressMarkers
             fretNumbers
 
-            // 맨 위에 깔아 손가락을 전부 받는다. 접촉 반지름까지 받아, 넓게 누르면(바레) 여러 줄로 편다.
-            // 지판 밖 터치는 `NeckGeometry.presses(at:majorRadius:)`가 걸러낸다.
             MultiTouchLayer(
-                // #36의 excludedHitRegions(기본 상단바) + 내 extraExcludedRegions(포지션 바) 둘 다 제외.
-                excludedHitRegions: excludedHitRegions + extraExcludedRegions,
+                excludedHitRegions: touchExcludedRegions,
                 onSamplesChanged: { samples in
                     let presses = samples.values.flatMap {
-                        NeckGeometry.presses(at: $0.location, majorRadius: $0.majorRadius)
+                        NeckGeometry.presses(
+                            at: $0.location,
+                            majorRadius: $0.majorRadius,
+                            targetFingering: targetFingering,
+                            targetFingers: targetFingers
+                        )
                     }
                     viewModel.pressesChanged(Set(presses))
                 }
             )
         }
         .frame(width: NeckGeometry.stage.width, height: NeckGeometry.stage.height)
-        .onChange(of: viewModel.fingering) { _, fingering in
-            onFingeringChanged?(fingering)
-        }
-        .onDisappear {
-            // 화면을 벗어나면 짚고 있던 것으로 남지 않게 한다.
-            viewModel.releaseAll()
+    }
+
+    private var touchExcludedRegions: [CGRect] {
+        let regions = excludedHitRegions + extraExcludedRegions
+        guard usesCompactLayout else { return regions }
+
+        let scale: CGFloat = 0.88
+        let center = CGPoint(x: NeckGeometry.stage.width / 2, y: NeckGeometry.stage.height / 2)
+        return regions.map { region in
+            CGRect(
+                x: center.x + (region.minX - center.x) / scale,
+                y: center.y + (region.minY - center.y) / scale,
+                width: region.width / scale,
+                height: region.height / scale
+            )
         }
     }
 
@@ -140,8 +170,9 @@ struct NeckScreen: View {
         ForEach(NeckGeometry.fingerMarkers(frettedByString: pressedFretted)) { marker in
             Capsule()
                 .fill(Color.gsAccent)
-                .overlay(Capsule().stroke(Color.gsOnAccent.opacity(0.4), lineWidth: 2))
+                .overlay(Capsule().stroke(Color.gsOnAccent.opacity(0.72), lineWidth: 2))
                 .frame(width: marker.size.width, height: marker.size.height)
+                .shadow(color: Color.gsAccent.opacity(0.42), radius: 8)
                 .position(marker.center)
         }
         .animation(.easeOut(duration: 0.12), value: pressedFretted)
@@ -158,6 +189,7 @@ struct NeckScreen: View {
                     .overlay(Capsule().stroke(Color.gsAccent, lineWidth: 2.5))
                     .frame(width: marker.size.width, height: marker.size.height)
                     .overlay(fingerLabel(marker))
+                    .rotationEffect(.degrees(targetGuideRotationDegrees))
                     .position(marker.center)
             }
             ForEach(Array(target.frets.enumerated()), id: \.offset) { index, fret in
@@ -197,11 +229,13 @@ struct NeckScreen: View {
                 Circle()
                     .stroke(Color.gsAccent, lineWidth: 2)
                     .frame(width: 15, height: 15)
+                    .rotationEffect(.degrees(targetGuideRotationDegrees))
                     .position(x: NeckGeometry.openMuteHintX, y: y)
             } else if fret < 0 {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color.gsTextSecondary)
+                    .rotationEffect(.degrees(targetGuideRotationDegrees))
                     .position(x: NeckGeometry.openMuteHintX, y: y)
             }
         }

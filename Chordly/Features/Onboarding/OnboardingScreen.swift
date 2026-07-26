@@ -1,32 +1,52 @@
 import SwiftUI
 
+enum OnboardingStartPath {
+    case iPhone
+    case iPadConnection
+}
+
 /// 화면 1 — 첫 실행 온보딩 (3장). (Figma 568-8814 · 568-38977 · 568-38981)
 ///
-/// 세 장의 안내(음량 → 방해금지 → iPad 연결)를 넘겨 보고, 마지막 **Start**로 온보딩을 마친다.
+/// 세 장의 안내(음량 → 방해금지 → 시작 방식)를 넘겨 보고, 마지막에 사용할 흐름을 고른다.
 /// 각 장은 Figma export 이미지를 통째 배경으로 쓴다(상단 페이지 점·일러스트·문구 포함).
-/// 온보딩을 마치면 `AppRouter`가 홈으로 보내고, 첫 실행이면 튜토리얼이 이어진다.
+/// 아이폰 단독 연주와 아이패드 연결은 서로 다른 화면과 튜토리얼로 이어진다.
 ///
-/// - Note: 이전 볼륨·방해금지 카드(인터랙티브)는 디자인이 정적 안내로 바뀌어 이미지로 대체됐다.
+/// - Note: 방해 금지 모드는 공개 API로 직접 토글할 수 없어 제어 센터 조작을 안내한다.
 struct OnboardingScreen: View {
-    @EnvironmentObject private var router: AppRouter
     @State private var page = 0
+    @State private var showsDoNotDisturbHelp = false
+    @StateObject private var guitarLoop = OnboardingGuitarLoopPlayer()
 
     private let stage = LayoutTokens.phoneStage
+    let onStart: (OnboardingStartPath) -> Void
+
+    init(onStart: @escaping (OnboardingStartPath) -> Void = { _ in }) {
+        self.onStart = onStart
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
             TabView(selection: $page) {
-                pageImage("OnboardingPage1").tag(0)
-                pageImage("OnboardingPage2").tag(1)
+                ZStack {
+                    pageImage("OnboardingPage1")
+                    nextButton {
+                        move(to: 1)
+                    }
+                    .position(x: stage.width / 2, y: 346)
+                }
+                .tag(0)
+
+                ZStack {
+                    Color.gsStageBackground
+                    focusModeIllustration
+                    focusModeMessage
+                    secondPageButtons
+                }
+                .frame(width: stage.width, height: stage.height)
+                .tag(1)
                 ZStack {
                     pageImage("OnboardingPage3")
-                    // 이미지에 그려진 "Start" 위에 투명 탭 영역을 얹는다.
-                    Button { router.completeOnboarding() } label: {
-                        Color.clear.contentShape(Rectangle())
-                    }
-                    .frame(width: 260, height: 58)
-                    .position(x: stage.width / 2, y: 346)
-                    .accessibilityLabel("온보딩 마치고 시작하기")
+                    startPathButtons
                 }
                 .tag(2)
             }
@@ -43,6 +63,145 @@ struct OnboardingScreen: View {
         }
         .frame(width: stage.width, height: stage.height)
         .ignoresSafeArea()
+        .onAppear { updateGuitarLoop(for: page) }
+        .onChange(of: page) { _, newPage in
+            updateGuitarLoop(for: newPage)
+        }
+        .onDisappear { guitarLoop.stop() }
+        .alert("집중 모드 켜기", isPresented: $showsDoNotDisturbHelp) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("앱이 집중 모드를 직접 켤 수 없어요. 화면 오른쪽 위에서 제어 센터를 내린 뒤 ‘집중 모드’에서 ‘방해 금지 모드’를 탭해주세요.")
+        }
+    }
+
+    private var focusModeMessage: some View {
+        Text("원활한 연주를 위해 집중 모드 활성화를 권장해요.")
+            .font(.gsBody)
+            .foregroundStyle(Color.gsTextPrimary)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: 650)
+            .frame(minHeight: 52)
+        .position(x: stage.width / 2, y: 250)
+    }
+
+    private var focusModeIllustration: some View {
+        Image(systemName: "bell.slash")
+            .symbolRenderingMode(.monochrome)
+            .font(.system(size: 86, weight: .thin))
+            .foregroundStyle(Color.gsTextPrimary)
+            .frame(width: 150, height: 112)
+            .position(x: stage.width / 2, y: 162)
+            .accessibilityHidden(true)
+    }
+
+    private var secondPageButtons: some View {
+        HStack(spacing: 14) {
+            Button {
+                showsDoNotDisturbHelp = true
+            } label: {
+                Label("집중 모드", systemImage: "moon.fill")
+                    .font(.gsHeadline)
+                    .foregroundStyle(Color.gsTextPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(width: 224, height: 50)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .accessibilityHint("제어 센터에서 집중 모드를 켜는 방법을 표시합니다.")
+
+            nextButton {
+                move(to: 2)
+            }
+        }
+        .position(x: stage.width / 2, y: 346)
+    }
+
+    private func nextButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Text("다음")
+                Image(systemName: "arrow.right")
+            }
+            .font(.gsHeadline)
+            .foregroundStyle(Color.gsOnAccent)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(width: 150, height: 50)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background(Capsule().fill(Color.gsAccent))
+        .glassEffect(.clear.interactive(), in: .capsule)
+    }
+
+    private func move(to page: Int) {
+        withAnimation(.easeInOut(duration: 0.24)) {
+            self.page = page
+        }
+    }
+
+    private var startPathButtons: some View {
+        ZStack {
+            // 원본 에셋에 포함된 Start 버튼을 같은 배경색으로 가린다.
+            Color.gsStageBackground
+                .frame(width: 610, height: 70)
+
+            HStack(spacing: 14) {
+                startButton(
+                    title: "아이폰으로 시작하기",
+                    systemImage: "iphone",
+                    isPrimary: true
+                ) {
+                    onStart(.iPhone)
+                }
+
+                startButton(
+                    title: "아이패드 연결하기",
+                    systemImage: "ipad",
+                    isPrimary: false
+                ) {
+                    onStart(.iPadConnection)
+                }
+            }
+        }
+        .position(x: stage.width / 2, y: 346)
+    }
+
+    private func startButton(
+        title: String,
+        systemImage: String,
+        isPrimary: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.gsHeadline)
+                .foregroundStyle(isPrimary ? Color.gsOnAccent : Color.gsTextPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .frame(width: 258, height: 50)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background {
+            if isPrimary {
+                Capsule().fill(Color.gsAccent)
+            }
+        }
+        .glassEffect(isPrimary ? .clear.interactive() : .regular.interactive(), in: .capsule)
+    }
+
+    private func updateGuitarLoop(for page: Int) {
+        if page == 0 {
+            guitarLoop.play()
+        } else {
+            guitarLoop.stop()
+        }
     }
 
     private var pageIndicator: some View {
@@ -74,6 +233,5 @@ struct OnboardingScreen: View {
 #Preview("온보딩") {
     PortraitLockedLandscapeStage {
         OnboardingScreen()
-            .environmentObject(AppRouter())
     }
 }

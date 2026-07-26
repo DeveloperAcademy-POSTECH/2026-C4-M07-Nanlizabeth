@@ -1,7 +1,6 @@
 import Combine
 import Foundation
 import MultipeerConnectivity
-import UIKit
 
 final class MultipeerService: NSObject, ObservableObject, MultipeerServiceProtocol {
     private let serviceType = "gtrsync-demo"
@@ -10,6 +9,7 @@ final class MultipeerService: NSObject, ObservableObject, MultipeerServiceProtoc
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
     private var discoveredPeerIDs: [MCPeerID] = []
+    private var pendingInvitationHandler: ((Bool, MCSession?) -> Void)?
 
     @Published private(set) var discoveredPeers: [String] = []
     @Published private(set) var connectedPeers: [String] = []
@@ -18,15 +18,15 @@ final class MultipeerService: NSObject, ObservableObject, MultipeerServiceProtoc
     var onConnectedPeersChanged: (([String]) -> Void)?
     var onConnectionStateChanged: ((PeerConnectionState) -> Void)?
     var onMessageReceived: ((PeerMessage, String) -> Void)?
+    var onInvitationReceived: ((String) -> Void)?
     var onLog: ((String) -> Void)?
 
     var localDisplayName: String {
         localPeerID.displayName
     }
 
-    override init() {
-        let name = "\(UIDevice.current.name)-\(UUID().uuidString.prefix(4))"
-        localPeerID = MCPeerID(displayName: name)
+    init(displayName: String = PeerDisplayNameStore.currentName) {
+        localPeerID = MCPeerID(displayName: displayName)
         session = MCSession(peer: localPeerID, securityIdentity: nil, encryptionPreference: .required)
         super.init()
         session.delegate = self
@@ -79,7 +79,16 @@ final class MultipeerService: NSObject, ObservableObject, MultipeerServiceProtoc
         onLog?("Invite sent to \(name)")
     }
 
+    func respondToInvitation(accept: Bool) {
+        guard let handler = pendingInvitationHandler else { return }
+        pendingInvitationHandler = nil
+        handler(accept, accept ? session : nil)
+        onLog?(accept ? "Invitation accepted" : "Invitation declined")
+    }
+
     func disconnect() {
+        pendingInvitationHandler?(false, nil)
+        pendingInvitationHandler = nil
         advertiser?.stopAdvertisingPeer()
         browser?.stopBrowsingForPeers()
         session.disconnect()
@@ -117,8 +126,13 @@ extension MultipeerService: MCNearbyServiceAdvertiserDelegate {
         invitationHandler: @escaping (Bool, MCSession?) -> Void
     ) {
         Task { @MainActor in
-            self.onLog?("Accepted invitation from \(peerID.displayName)")
-            invitationHandler(true, self.session)
+            self.pendingInvitationHandler?(false, nil)
+            self.pendingInvitationHandler = invitationHandler
+            self.onInvitationReceived?(peerID.displayName)
+            self.onLog?("Invitation received from \(peerID.displayName)")
+            if self.onInvitationReceived == nil {
+                self.respondToInvitation(accept: false)
+            }
         }
     }
 

@@ -144,35 +144,22 @@ struct GuitarStrumView: View {
     private func padImageMetrics(in size: CGSize)
         -> (imageWidth: CGFloat, imageHeight: CGFloat, bandHeight: CGFloat, imageOffsetY: CGFloat) {
         let scale = max(stageMetrics.scale, 0.01)
-        let bandHeight = StrumNeck.spanPointsPad / scale
-        let imageHeight = bandHeight / StrumNeck.imageBandRatio
-        let imageWidth = imageHeight * StrumNeck.imageAspect
+        let bandHeight = StrumNeckLayout.spanPointsPad / scale
+        let imageHeight = bandHeight / StrumNeckLayout.imageBandRatio
+        let imageWidth = imageHeight * StrumNeckLayout.imageAspect
         // 이미지 속 줄 중심(imageBandCenter)이 화면의 verticalCenter에 오도록 이미지를 옮긴다.
-        let imageOffsetY = size.height * (StrumNeck.verticalCenterPad - 0.5)
-            + (0.5 - StrumNeck.imageBandCenter) * imageHeight
+        let imageOffsetY = size.height * (StrumNeckLayout.verticalCenterPad - 0.5)
+            + (0.5 - StrumNeckLayout.imageBandCenter) * imageHeight
         return (imageWidth, imageHeight, bandHeight, imageOffsetY)
     }
 
     // MARK: - 줄 밴드(터치 영역). 넥 고정 + 세로 정중앙. iPhone·iPad 공통 원리.
 
     private func stringBandFrame(in size: CGSize) -> CGRect {
-        let verticalCenter = isPad ? StrumNeck.verticalCenterPad : StrumNeck.verticalCenterPhone
-        let centerY = size.height * verticalCenter
-        let scale = max(stageMetrics.scale, 0.01)
-
-        let bandHeight: CGFloat
-        if isPad {
-            bandHeight = padImageMetrics(in: size).bandHeight
-        } else {
-            // iPhone도 넥 고정: 배율 역보정. 작은 기기에서 캔버스를 넘지 않게 클램프.
-            bandHeight = min(StrumNeck.spanPointsPhone / scale, size.height)
-        }
-
-        return CGRect(
-            x: 0,
-            y: centerY - bandHeight / 2,
-            width: size.width,
-            height: bandHeight
+        StrumNeckLayout.stringBandFrame(
+            in: size,
+            isPad: isPad,
+            stageScale: stageMetrics.scale
         )
     }
 
@@ -211,7 +198,7 @@ struct GuitarStrumView: View {
 
 /// 넥(6줄 스팬)을 **화면에서 항상 같은 크기**로 고정하고, 세로 정중앙에 둔다.
 /// 기기 크기가 달라도 넥 두께가 일정하고, 대신 (iPad는) 이미지 확대 정도가 달라진다.
-private enum StrumNeck {
+enum StrumNeckLayout {
     /// iPhone 줄 중심.
     static let verticalCenterPhone: CGFloat = 0.56
     /// iPad 줄 중심은 기존 정중앙을 유지한다.
@@ -228,6 +215,24 @@ private enum StrumNeck {
     static let imageBandCenter: CGFloat = 0.499
     /// iPad 이미지 안 6줄이 퍼진 전체 높이 (이미지 높이 대비, 측정 span 0.260 × 6/5).
     static let imageBandRatio: CGFloat = 0.312
+
+    static func stringBandFrame(
+        in size: CGSize,
+        isPad: Bool,
+        stageScale: CGFloat
+    ) -> CGRect {
+        let verticalCenter = isPad ? verticalCenterPad : verticalCenterPhone
+        let span = isPad ? spanPointsPad : spanPointsPhone
+        let bandHeight = min(span / max(stageScale, 0.01), size.height)
+        let centerY = size.height * verticalCenter
+
+        return CGRect(
+            x: 0,
+            y: centerY - bandHeight / 2,
+            width: size.width,
+            height: bandHeight
+        )
+    }
 }
 
 #Preview("Strum Axis Y") {

@@ -54,6 +54,8 @@ enum NeckGeometry {
 
     /// 짚은 자리 표시의 지름. 손끝보다 살짝 크게 잡아 **손가락에 가리지 않게** 한다.
     static let pressMarkerDiameter: CGFloat = 34
+    /// 실제로 누른 자리 피드백은 손가락 아래에서도 보이도록 프렛 칸 안에서 가로로 길게 보여준다.
+    static let activePressMarkerHeight: CGFloat = 30
 
     /// 짚을 수 있는 프렛 수. 경계선이 n개면 칸은 n-1개다.
     static var fretCount: Int { max(fretBoundaryXs.count - 1, 0) }
@@ -81,22 +83,67 @@ enum NeckGeometry {
     /// 값이 클수록 손가락을 살짝만 눕혀도 이웃 줄이 함께 잡힌다.
     static let barreRadiusScale: CGFloat = 1.4
 
-    /// 터치 한 개(중심 + 접촉 반지름) → 짚은 칸들. **넓게 누르면(바레) 세로로 인접한 여러 줄**을
-    /// 같은 프렛으로 함께 짚은 것으로 본다. (docs/PLAN-chord-drill 개선 — 한 손가락 바레 입력)
+    /// 터치 한 개(중심 + 접촉 반지름) → 짚은 칸들.
     ///
-    /// 접촉이 작으면(지문 하나) 가장 가까운 줄 하나만 — 기존 동작과 같다(회귀 없음).
-    static func presses(at point: CGPoint, majorRadius: CGFloat) -> [FretPress] {
+    /// 목표 코드에서 같은 손가락이 같은 프렛의 인접한 두 현을 눌러야 한다면, 두 현 중앙의 터치를
+    /// 양쪽 현 입력으로 확장한다. 그 외에는 기존처럼 가장 가까운 현 하나만 선택한다.
+    static func presses(
+        at point: CGPoint,
+        majorRadius: CGFloat,
+        targetFingering: GuitarFingering? = nil,
+        targetFingers: [Int] = []
+    ) -> [FretPress] {
         guard point.y >= boardTop, point.y <= boardBottom, let fret = fret(atX: point.x) else {
             return []
         }
 
-        let halfBand = majorRadius * barreRadiusScale
-        var covered = stringYs.indices.filter { abs(stringYs[$0] - point.y) <= halfBand }
-        // 접촉이 작아 아무 줄도 안 걸리면, 가장 가까운 줄 하나로 친다.
-        if covered.isEmpty, let nearest = stringIndex(atY: point.y) {
-            covered = [nearest]
+        if let pair = sameFingerPair(
+            nearY: point.y,
+            fret: fret,
+            majorRadius: majorRadius,
+            targetFingering: targetFingering,
+            targetFingers: targetFingers
+        ) {
+            return [
+                FretPress(stringIndex: pair.lower, fret: fret),
+                FretPress(stringIndex: pair.upper, fret: fret),
+            ]
         }
-        return covered.map { FretPress(stringIndex: $0, fret: fret) }
+
+        guard let nearest = stringIndex(atY: point.y) else { return [] }
+        return [FretPress(stringIndex: nearest, fret: fret)]
+    }
+
+    private static func sameFingerPair(
+        nearY y: CGFloat,
+        fret: Int,
+        majorRadius: CGFloat,
+        targetFingering: GuitarFingering?,
+        targetFingers: [Int]
+    ) -> (lower: Int, upper: Int)? {
+        guard let targetFingering,
+              targetFingering.frets.count == stringYs.count,
+              targetFingers.count == stringYs.count
+        else { return nil }
+
+        let tolerance = min(max(majorRadius * 0.45, 8), 14)
+        let candidates = (0..<(stringYs.count - 1)).compactMap { lower -> (Int, CGFloat)? in
+            let upper = lower + 1
+            let finger = targetFingers[lower]
+            guard finger > 0,
+                  targetFingers[upper] == finger,
+                  targetFingering.frets[lower] == fret,
+                  targetFingering.frets[upper] == fret
+            else { return nil }
+
+            let midpoint = (stringYs[lower] + stringYs[upper]) / 2
+            return (lower, abs(y - midpoint))
+        }
+
+        guard let closest = candidates.min(by: { $0.1 < $1.1 }),
+              closest.1 <= tolerance
+        else { return nil }
+        return (closest.0, closest.0 + 1)
     }
 
     /// 세로 위치 → 줄 번호.
@@ -156,6 +203,14 @@ enum NeckGeometry {
         return (fretBoundaryXs[fret - 1] + fretBoundaryXs[fret]) / 2
     }
 
+    static func activePressMarkerWidth(_ fret: Int) -> CGFloat {
+        guard fretCount > 0, (1...fretCount).contains(fret) else { return pressMarkerDiameter }
+        let rightEdge = fretBoundaryXs[fret - 1]
+        let leftEdge = fretBoundaryXs[fret]
+        let fretWidth = abs(rightEdge - leftEdge)
+        return max(activePressMarkerHeight, fretWidth - 34)
+    }
+
     /// 6번 저음줄부터 1번 고음줄까지의 굵기.
     static let stringThicknesses: [CGFloat] = [
         5.0,
@@ -212,8 +267,8 @@ enum NeckGeometry {
                         id: "\(fret)-\(run.start)-\(run.end)",
                         center: CGPoint(x: x, y: (yTop + yBottom) / 2),
                         size: CGSize(
-                            width: pressMarkerDiameter,
-                            height: isBarre ? (yBottom - yTop) + pressMarkerDiameter : pressMarkerDiameter
+                            width: activePressMarkerWidth(fret),
+                            height: isBarre ? (yBottom - yTop) + activePressMarkerHeight : activePressMarkerHeight
                         ),
                         isBarre: isBarre
                     )

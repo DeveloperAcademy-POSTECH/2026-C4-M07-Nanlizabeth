@@ -15,6 +15,8 @@ struct MainInstrumentScreen: View {
     /// 모드 B의 자동 왼손 — 고른 코드진행을 BPM에 맞춰 짚어준다. 스트럼 화면이 이 코드로 소리 낸다.
     @StateObject private var strumProgression = ChordProgressionPlayer()
     @State private var isPeerPopoverPresented = false
+    @State private var isNeckPositionExpanded = false
+    @AppStorage("usesCompactNeckLayout") private var usesCompactNeckLayout = false
 
     /// 스트로크 선택(U4)에서 고른 주법. 재생 시 자동 스트럼이 이걸 긁는다.
     var selectedStrumPattern: StrumPattern?
@@ -23,7 +25,7 @@ struct MainInstrumentScreen: View {
     var selectedProgression: ChordProgression?
 
     /// 연결 버튼(🔗)을 눌렀을 때. 기기 찾기 화면으로 이동한다 (AppRootView가 라우팅).
-    var onPeerConnect: () -> Void = {}
+    var onPeerConnect: () -> Bool = { true }
 
     /// 코드/스트로크 모드를 바꿀 때. **라우터 route까지 바꾼다** — 안 그러면 뒤로가기가 넥으로 샌다.
     var onModeChange: (PrototypeMode) -> Void = { _ in }
@@ -41,14 +43,17 @@ struct MainInstrumentScreen: View {
 
     /// 넥 포지션 컨트롤(슬라이더)이 놓이는 자리. 지판이 시작되는 y=68보다 위쪽의
     /// 상단 안전영역 안에 들어가도록 작게 두며, 이 영역은 넥 터치에서 제외된다.
-    private static let neckPositionBarSize = CGSize(width: 120, height: 36)
+    private static let neckPositionControlExpandedWidth: CGFloat = 212
+    private static let neckPositionControlCollapsedWidth: CGFloat = 72
 
     private var neckPositionBarRegion: CGRect {
         CGRect(
-            x: stageSafeArea.leading - 44,
-            y: stageSafeArea.top,
-            width: Self.neckPositionBarSize.width,
-            height: Self.neckPositionBarSize.height
+            x: 20,
+            y: max(8, stageSafeArea.top - 4),
+            width: isNeckPositionExpanded
+                ? Self.neckPositionControlExpandedWidth
+                : Self.neckPositionControlCollapsedWidth,
+            height: 46
         )
     }
 
@@ -66,39 +71,34 @@ struct MainInstrumentScreen: View {
                 showsModeToggle: !isPad,
                 // BPM은 **일시정지 중에만** 바꾼다 — 재생 중엔 잠근다.
                 bpmEnabled: !viewModel.isPlaying,
-                // 코드 모드에서만 연결 버튼 왼쪽에 드릴 진입 버튼이 뜬다 (TopControlBar가 모드로 거른다).
-                onStartDrill: isPad ? nil : onStartDrill,
+                hidesStandaloneControls: peer.isConnected,
+                // 연결 중에는 곡을 선택해 동기화할 수 있는 코드 담당에게만 음악 버튼을 보여준다.
+                onStartDrill: showsSongSelectionButton ? onStartDrill : nil,
                 tutorialHighlight: tutorial?.highlightTarget,
                 onModeChange: onModeChange,
                 onPeer: togglePeerPopover,
                 onAction: viewModel.openActionScreen,
-                onTogglePlayback: viewModel.togglePlayback,
-                onToggleBPM: { if !viewModel.isPlaying { viewModel.toggleBPM() } },
+                onTogglePlayback: {
+                    let startsPlaying = !viewModel.isPlaying
+                    viewModel.togglePlayback()
+                    if startsPlaying {
+                        tutorial?.handle(.playbackStarted)
+                    }
+                },
+                onToggleBPM: {
+                    guard !viewModel.isPlaying else { return }
+                    viewModel.toggleBPM()
+                    if viewModel.showBPM {
+                        tutorial?.handle(.bpmOpened)
+                    }
+                },
                 onToggleControls: viewModel.toggleControls
             )
-            .padding(.top, max(20, stageSafeArea.top))
+            .padding(.top, max(12, stageSafeArea.top - 4))
             .padding(.leading, stageSafeArea.leading)
             .padding(.trailing, stageSafeArea.trailing)
             // 기타의 전체 화면 UIKit 멀티터치 레이어보다 항상 위에서 버튼 입력을 받는다.
             .zIndex(10)
-
-            if isPeerPopoverPresented {
-                if !isPad {
-                    PeerQuickConnectPopover(viewModel: peer)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .padding(.leading, peerPopoverRegion.minX)
-                        .padding(.top, peerPopoverRegion.minY)
-                        .zIndex(12)
-                }
-            }
-
-            // 재생 중엔 BPM 팝오버를 감춘다 (일시정지 상태에서만 조절 가능).
-            if viewModel.showBPM && viewModel.isControlBarExpanded && !viewModel.isPlaying {
-                BPMPopover(bpm: $viewModel.bpm)
-                    .padding(.top, max(88, stageSafeArea.top))
-                    .padding(.trailing, max(100, stageSafeArea.trailing))
-                    .zIndex(11)
-            }
 
             #if DEBUG
             if viewModel.mode == .strum {
@@ -110,18 +110,23 @@ struct MainInstrumentScreen: View {
             #endif
         }
         .overlayPreferenceValue(PeerButtonBoundsPreferenceKey.self) { buttonAnchor in
-            if isPad, isPeerPopoverPresented, let buttonAnchor {
+            if isPeerPopoverPresented, let buttonAnchor {
                 GeometryReader { proxy in
                     let buttonFrame = proxy[buttonAnchor]
                     let popoverWidth = InstrumentControlHitRegion.peerPopover.width
                     let centeredX = buttonFrame.midX - popoverWidth / 2
                     let popoverX = min(
                         max(stageSafeArea.leading, centeredX),
-                        LayoutTokens.padStage.width - stageSafeArea.trailing - popoverWidth
+                        proxy.size.width - stageSafeArea.trailing - popoverWidth
                     )
 
                     ZStack(alignment: .topLeading) {
-                        PeerQuickConnectPopover(viewModel: peer)
+                        PeerQuickConnectPopover(
+                            viewModel: peer,
+                            onPeerSelected: { name in
+                                tutorial?.handle(.peerSelected(name))
+                            }
+                        )
                             .offset(
                                 x: popoverX,
                                 y: buttonFrame.maxY + 8
@@ -143,7 +148,11 @@ struct MainInstrumentScreen: View {
             refreshAuto()
             if connected {
                 isPeerPopoverPresented = false
+                viewModel.showBPM = false
             }
+        }
+        .onReceive(chordMode.strumPerformed) { _ in
+            tutorial?.handle(.automaticStrum(chordMode.neck.fingering))
         }
     }
 
@@ -189,19 +198,26 @@ struct MainInstrumentScreen: View {
 
     private var instrumentHitRegions: [CGRect] {
         isPeerPopoverPresented
-            ? [InstrumentControlHitRegion.topBar, peerPopoverRegion]
-            : [InstrumentControlHitRegion.topBar]
+            ? [topControlBarRegion, peerPopoverRegion]
+            : [topControlBarRegion]
     }
 
-    /// iPhone은 기존 위치를 유지한다. iPad에서는 우측 상단바의 첫 버튼인 연결 버튼 바로 아래에
-    /// 팝오버를 맞추고, 실제 표시 위치와 기타 터치 제외 영역이 같은 사각형을 공유한다.
-    private var peerPopoverRegion: CGRect {
-        guard isPad else {
-            return InstrumentControlHitRegion.peerPopover
-        }
-
+    /// UIKit 멀티터치 레이어가 SwiftUI 상단 버튼을 가로채지 않도록 현재 도화지 전체 폭을 제외한다.
+    /// iPad 스트럼은 1366pt 도화지를 쓰므로 아이폰용 고정 x 좌표로는 우측 버튼을 보호할 수 없다.
+    private var topControlBarRegion: CGRect {
+        let topPadding = max(12, stageSafeArea.top - 4)
         return CGRect(
-            x: LayoutTokens.padStage.width
+            x: 0,
+            y: 0,
+            width: stageReferenceWidth,
+            height: topPadding + 54
+        )
+    }
+
+    /// 기타 터치 제외 영역. 팝오버의 실제 표시는 연결 버튼 앵커를 기준으로 배치한다.
+    private var peerPopoverRegion: CGRect {
+        return CGRect(
+            x: stageReferenceWidth
                 - stageSafeArea.trailing
                 - InstrumentControlHitRegion.peerPopover.width,
             y: stageSafeArea.top + 54,
@@ -210,9 +226,28 @@ struct MainInstrumentScreen: View {
         )
     }
 
+    private var stageReferenceWidth: CGFloat {
+        isPad ? LayoutTokens.padStage.width : LayoutTokens.phoneStage.width
+    }
+
+    private var showsSongSelectionButton: Bool {
+        if peer.isConnected {
+            return peer.role == .fingering
+        }
+        return !isPad
+    }
+
     private func togglePeerPopover() {
+        if peer.isConnected {
+            isPeerPopoverPresented = false
+            peer.disconnect()
+            return
+        }
+
+        guard onPeerConnect() else { return }
+        tutorial?.handle(.peerButtonTapped)
         isPeerPopoverPresented.toggle()
-        if isPeerPopoverPresented, !peer.isConnected {
+        if isPeerPopoverPresented {
             peer.startBrowsing()
         }
     }
@@ -227,20 +262,32 @@ struct MainInstrumentScreen: View {
             NeckScreen(
                 viewModel: chordMode.neck,
                 onFingeringChanged: { fingering in
-                    peer.sendFingering(fingering)
+                    let transmittedFingering =
+                        ChordVoicingResolver.resolvedVoicing(for: fingering) ?? fingering
+                    peer.sendFingering(transmittedFingering)
                     tutorial?.handle(.chordFretted(fingering))   // 튜토리얼: 첫 코드 짚기 검증
                 },
                 // 튜토리얼 단계면 목표 코드를 라임 점으로 표시한다.
                 targetFingering: tutorial?.neckTargetChord?.fingering,
                 targetFingers: tutorial?.neckTargetChord?.fingers ?? [],
+                targetGuideRotationDegrees: tutorial?.targetGuideRotationDegrees ?? 0,
                 // #36 연결 팝오버 영역 + 내 포지션 바 영역을 프렛 짚기에서 제외.
                 excludedHitRegions: instrumentHitRegions,
-                extraExcludedRegions: [neckPositionBarRegion]
+                extraExcludedRegions: [neckPositionBarRegion],
+                usesCompactLayout: usesCompactNeckLayout
             )
                 .ignoresSafeArea()
-                // 넥을 사운드홀 쪽 높은 프렛으로 옮기는 컨트롤 (슬라이더 ⟷ 모션 A/B).
+                // 왼쪽 끝의 포지션/손 크기 컨트롤. 슬라이더는 필요할 때만 아래로 펼친다.
                 .overlay {
-                    NeckPositionControl(slider: chordMode.sliderPosition)
+                    NeckPositionControl(
+                        slider: chordMode.sliderPosition,
+                        isExpanded: $isNeckPositionExpanded,
+                        usesCompactLayout: $usesCompactNeckLayout,
+                        highlightsSizeButton: tutorial?.highlightTarget == .neckSizeButton,
+                        onSizeChanged: {
+                            tutorial?.handle(.neckLayoutChanged)
+                        }
+                    )
                         .frame(
                             width: neckPositionBarRegion.width,
                             height: neckPositionBarRegion.height
@@ -317,33 +364,60 @@ struct MainInstrumentScreen: View {
 ///   전환)은 그대로 남아 있어, 안정화되면 토글만 다시 노출하면 된다.
 private struct NeckPositionControl: View {
     @ObservedObject var slider: SliderNeckPositionProvider
+    @Binding var isExpanded: Bool
+    @Binding var usesCompactLayout: Bool
+    var highlightsSizeButton = false
+    var onSizeChanged: () -> Void = {}
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text("\(slider.position + 1)fr")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .frame(width: 26, alignment: .leading)
+        HStack(spacing: 8) {
+            LiquidGlassCompactToggleButton(
+                systemName: isExpanded ? "chevron.compact.left" : "chevron.compact.right"
+            ) {
+                withAnimation(.easeOut(duration: 0.18)) { isExpanded.toggle() }
+            }
+            .accessibilityLabel(isExpanded ? "프렛 슬라이더 닫기" : "프렛 슬라이더 열기")
 
-            Slider(
-                value: Binding(get: { slider.sliderValue }, set: { slider.sliderValue = $0 }),
-                in: 0...Double(max(slider.maxPosition, 1)),
-                step: 1
-            )
-            .tint(Color.gsAccent)
-            // 넥과 방향을 맞춘다: **오른쪽=너트(1프렛), 왼쪽=사운드홀(높은 프렛)**.
-            // 손잡이가 오른쪽에서 시작해 사운드홀 쪽(왼쪽)으로 움직인다.
-            .scaleEffect(x: -1, y: 1)
-            .accessibilityLabel("프렛 위치")
-            .accessibilityValue("\(slider.position + 1)프렛")
+            if isExpanded {
+                HStack(spacing: 6) {
+                    Text("\(slider.position + 1)fr")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .frame(width: 28, alignment: .leading)
+
+                    Slider(
+                        value: Binding(get: { slider.sliderValue }, set: { slider.sliderValue = $0 }),
+                        in: 0...Double(max(slider.maxPosition, 1)),
+                        step: 1
+                    )
+                    .tint(Color.gsAccent)
+                    .scaleEffect(x: -1, y: 1)
+                    .accessibilityLabel("프렛 위치")
+                    .accessibilityValue("\(slider.position + 1)프렛")
+                }
+                .padding(.horizontal, 10)
+                .frame(width: 132, height: 40)
+                .background {
+                    Color.clear
+                        .glassEffect(.regular, in: .capsule)
+                        .allowsHitTesting(false)
+                }
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
+            LiquidGlassCompactToggleButton(
+                systemName: usesCompactLayout
+                    ? "arrow.up.left.and.arrow.down.right"
+                    : "arrow.down.right.and.arrow.up.left"
+            ) {
+                withAnimation(.easeOut(duration: 0.18)) { usesCompactLayout.toggle() }
+                onSizeChanged()
+            }
+            .tutorialPulseHighlight(highlightsSizeButton, cornerRadius: 20)
+            .accessibilityLabel(usesCompactLayout ? "기본 손 간격" : "좁은 손 간격")
+            .accessibilityValue(usesCompactLayout ? "좁게" : "기본")
         }
-        .padding(.horizontal, 10)
-        .frame(maxHeight: .infinity)
-        .background {
-            Color.clear
-                .glassEffect(.regular, in: .capsule)
-                .allowsHitTesting(false)
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }

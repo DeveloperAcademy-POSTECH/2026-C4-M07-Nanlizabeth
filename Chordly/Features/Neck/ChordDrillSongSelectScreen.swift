@@ -3,7 +3,7 @@ import SwiftUI
 /// 코드 드릴 **노래 선택** 화면. (docs/PLAN-chord-drill 확장)
 ///
 /// 드릴 버튼을 누르면 바로 시작하지 않고, 먼저 여기서 노래를 하나 고른다. 고른 노래의 코드 진행을
-/// 순서대로 짚는 연습으로 이어진다. 곡 목록은 `PracticeSongData`(저작권 없는 동요·전통곡).
+/// 순서대로 짚는 연습으로 이어진다. 곡 목록은 `PracticeSongData`에서 관리한다.
 ///
 /// U5(코드진행 선택)와 같은 헤더·카드 스타일을 쓴다. 확정 버튼 없이 **탭하면 바로 시작**한다.
 struct ChordDrillSongSelectScreen: View {
@@ -12,9 +12,12 @@ struct ChordDrillSongSelectScreen: View {
     let onBack: () -> Void
     let onSelect: (PracticeSong) -> Void
 
+    private let contentMaxWidth: CGFloat = 560
+    private let headerHeight: CGFloat = 56
+
     var body: some View {
         VStack(spacing: 0) {
-            HeaderBar(title: "노래 선택", onBack: onBack)
+            songSelectHeader
 
             ScrollView {
                 LazyVStack(spacing: Spacing.sm) {
@@ -25,11 +28,36 @@ struct ChordDrillSongSelectScreen: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .stageSafeAreaHorizontalPadding(minimum: Spacing.xl)
+                .frame(maxWidth: contentMaxWidth)
+                .frame(maxWidth: .infinity)
+                .padding(.leading, max(Spacing.xl, stageSafeArea.leading))
+                .padding(.trailing, max(Spacing.xl, stageSafeArea.trailing))
                 .padding(.top, Spacing.xs)
                 .padding(.bottom, max(Spacing.lg, stageSafeArea.bottom))
             }
         }
+    }
+
+    private var songSelectHeader: some View {
+        ZStack {
+            Text("노래 목록")
+                .font(.gsHeading)
+                .bold()
+                .foregroundStyle(Color.gsTextPrimary)
+
+            HStack {
+                LiquidGlassIconButton(systemName: "chevron.left", action: onBack)
+                    .accessibilityLabel("뒤로")
+
+                Spacer()
+            }
+        }
+        .frame(maxWidth: contentMaxWidth)
+        .frame(maxWidth: .infinity)
+        .frame(height: headerHeight)
+        .padding(.top, stageSafeArea.top)
+        .padding(.leading, max(Spacing.xl, stageSafeArea.leading))
+        .padding(.trailing, max(Spacing.xl, stageSafeArea.trailing))
     }
 }
 

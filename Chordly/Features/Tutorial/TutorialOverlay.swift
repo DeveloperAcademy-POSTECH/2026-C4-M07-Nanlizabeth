@@ -15,10 +15,28 @@ struct TutorialOverlay: View {
                     .ignoresSafeArea()
                     .transition(.opacity)
             }
+            if tutorial.showsSuccessBorder {
+                TutorialSuccessBorder()
+                    .transition(.opacity)
+            }
+            if tutorial.showsChordConfetti {
+                ConfettiView(count: 34)
+                    .frame(width: 430, height: 210)
+                    .clipped()
+                    .position(x: 520, y: 190)
+                    .transition(.opacity)
+            }
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
-                dialog
-                    .frame(maxWidth: 500, alignment: .leading)
+                dialogGroup
+                    .frame(
+                        width: tutorial.keepsBPMKeypadClear ? 370 : 500,
+                        alignment: .leading
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: tutorial.keepsBPMKeypadClear ? .leading : .center
+                    )
                     .stageSafeAreaHorizontalPadding(minimum: 18)
                     .padding(.bottom, max(35, stageSafeArea.bottom))
             }
@@ -28,19 +46,19 @@ struct TutorialOverlay: View {
         .animation(.easeOut(duration: 0.2), value: tutorial.lastActionDone)
     }
 
+    private var dialogGroup: some View {
+        dialog
+        .rotationEffect(.degrees(tutorial.rotatesDialogForUpsideDownViewing ? 180 : 0))
+    }
+
     private var dialog: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 18) {
                 Text(headerText)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.gsAccent)
-                Spacer()
-                if showsSkip {
-                    Button("이 단계 건너뛰기") { tutorial.skip() }
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .buttonStyle(.plain)
-                }
+                tutorialControl
+                Spacer(minLength: 0)
             }
             HStack(alignment: .center, spacing: 12) {
                 Text(bodyText)
@@ -49,6 +67,10 @@ struct TutorialOverlay: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 trailingButton
+            }
+            if tutorial.showsFingerNumberLegend {
+                fingerNumberLegend
+                    .padding(.top, 2)
             }
         }
         .padding(.horizontal, 18)
@@ -64,25 +86,104 @@ struct TutorialOverlay: View {
     // MARK: 내용
 
     private var headerText: String {
-        tutorial.isCelebrating ? "Tutorial Complete" : "\(tutorial.displayStepNumber) / \(tutorial.displayTotalSteps)"
+        if tutorial.isCelebrating { return "Tutorial Complete" }
+        if tutorial.isReadyToEnjoy { return "Ready" }
+        if tutorial.isConnectionTutorial {
+            return "디바이스 연결해보기 · \(tutorial.displayStepNumber) / \(tutorial.displayTotalSteps)"
+        }
+        return "\(tutorial.displayStepNumber) / \(tutorial.displayTotalSteps)"
     }
 
     private var bodyText: String {
-        tutorial.isCelebrating
-            ? "이제 Chordly를 마음껏 즐겨보세요!"
-            : (tutorial.currentStep?.message ?? "")
+        if tutorial.isCelebrating {
+            return "멋지게 첫 연주를 완성했어요!"
+        }
+        if tutorial.isReadyToEnjoy {
+            return "노래 목록에서 원하는 곡을 골라 마음껏 즐겨보세요!"
+        }
+        return tutorial.displayMessage
     }
 
     private var showsSkip: Bool {
-        tutorial.isRunning && tutorial.currentStep?.showsCompleteButton == false
+        tutorial.isRunning && tutorial.currentStep?.allowsSkip == true
+    }
+
+    @ViewBuilder private var tutorialControl: some View {
+        if tutorial.isConnectionTutorial {
+            tutorialControlButton("튜토리얼 종료") {
+                tutorial.endConnectionTutorial()
+            }
+        } else if showsSkip {
+            tutorialControlButton("이 단계 건너 뛰기") {
+                tutorial.skip()
+            }
+        }
+    }
+
+    private func tutorialControlButton(
+        _ title: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.gsTextPrimary.opacity(0.78))
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(height: 32)
+                .background {
+                    Capsule()
+                        .fill(Color.black.opacity(0.48))
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                        )
+                }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var fingerNumberLegend: some View {
+        HStack(spacing: 12) {
+            Text("손가락 번호")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.gsTextSecondary)
+
+            fingerLegendItem(number: 1, name: "검지")
+            fingerLegendItem(number: 2, name: "중지")
+            fingerLegendItem(number: 3, name: "약지")
+            fingerLegendItem(number: 4, name: "새끼")
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("손가락 번호, 1 검지, 2 중지, 3 약지, 4 새끼")
+    }
+
+    private func fingerLegendItem(number: Int, name: String) -> some View {
+        HStack(spacing: 4) {
+            Text("\(number)")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.gsOnAccent)
+                .frame(width: 18, height: 18)
+                .background(Circle().fill(Color.gsAccent))
+            Text(name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.gsTextPrimary)
+        }
     }
 
     @ViewBuilder private var trailingButton: some View {
         if tutorial.isCelebrating {
-            limeButton("시작하기", enabled: true) { tutorial.finish() }
-        } else if tutorial.currentStep?.showsCompleteButton == true {
-            // 줄을 실제로 튕겨야 활성화된다 (동작 검증).
-            limeButton("완료", enabled: tutorial.lastActionDone) { tutorial.complete() }
+            limeButton(tutorial.celebrationButtonTitle, enabled: true) {
+                tutorial.continueAfterCelebration()
+            }
+        } else if tutorial.isReadyToEnjoy {
+            limeButton("즐기기", enabled: true) { tutorial.finish() }
+        } else if let title = tutorial.currentStep?.actionButtonTitle {
+            limeButton(title, enabled: tutorial.lastActionDone) {
+                tutorial.confirmCurrentStep()
+            }
         }
     }
 
@@ -97,6 +198,29 @@ struct TutorialOverlay: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
+    }
+}
+
+private struct TutorialSuccessBorder: View {
+    @State private var isBright = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 48)
+                .stroke(Color.gsAccent.opacity(isBright ? 1 : 0.30), lineWidth: isBright ? 5 : 2)
+                .shadow(color: Color.gsAccent.opacity(isBright ? 0.95 : 0.25), radius: isBright ? 14 : 4)
+                .padding(14)
+
+            RoundedRectangle(cornerRadius: 43)
+                .stroke(Color.white.opacity(isBright ? 0.68 : 0.12), lineWidth: 1.5)
+                .padding(19)
+        }
+        .allowsHitTesting(false)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                isBright = true
+            }
+        }
     }
 }
 

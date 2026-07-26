@@ -27,9 +27,14 @@ struct AppRootView: View {
 
     /// 코드 드릴에서 고른 연습곡. 노래 선택 화면 → 드릴 화면으로 넘겨준다.
     @State private var selectedDrillSong: PracticeSong?
+    /// 노래 선택으로 들어간 당시의 모드. 같은 곡이어도 코드/스트로크 드릴 화면이 다르다.
+    @State private var selectedDrillMode: PrototypeMode = .chord
 
     /// 첫 실행 튜토리얼 — 온보딩 뒤에 실제 화면 위로 대화창을 얹어 단계를 진행한다.
     @StateObject private var tutorial = TutorialController()
+    @State private var showsDeviceNamePrompt = false
+    @State private var startsConnectionTutorialAfterNaming = false
+    @State private var showsConnectionSuccess = false
 
     /// 첫 실행 튜토리얼은 왼손 코드 조작이 있는 iPhone에서만 진행한다.
     private var supportsTutorial: Bool {
@@ -40,7 +45,10 @@ struct AppRootView: View {
     /// 나머지 화면·기기는 기존 iPhone 도화지(874×402) 그대로. (iPad 다른 화면들의 4:3 재배치는 이후 작업)
     private var stageReference: CGSize {
         let isPad = DeviceInfoProvider.currentDeviceType == .iPad
-        return isPad && router.currentRoute == .strum ? LayoutTokens.padStage : LayoutTokens.phoneStage
+        let usesPadStrumStage =
+            router.currentRoute == .strum
+            || (router.currentRoute == .chordDrill && selectedDrillMode == .strum)
+        return isPad && usesPadStrumStage ? LayoutTokens.padStage : LayoutTokens.phoneStage
     }
 
     var body: some View {
@@ -52,9 +60,44 @@ struct AppRootView: View {
                 screen
 
                 // 이미 완성된 화면 위에 튜토리얼 대화창을 얹는다. 대화창 밖 터치는 막지 않는다.
-                if supportsTutorial, tutorial.isOverlayVisible {
+                if tutorial.isOverlayVisible,
+                   supportsTutorial || tutorial.isConnectionTutorial {
                     TutorialOverlay(tutorial: tutorial)
                 }
+
+                if showsDeviceNamePrompt {
+                    DeviceNamePrompt(initialName: peerConnect.localDisplayName) { name in
+                        guard peerConnect.setDisplayName(name) else { return }
+                        showsDeviceNamePrompt = false
+                        if startsConnectionTutorialAfterNaming {
+                            startsConnectionTutorialAfterNaming = false
+                            tutorial.startConnectionTutorial()
+                        }
+                    }
+                }
+
+                if let peerName = peerConnect.pendingInvitationPeerName {
+                    PeerInvitationPopup(
+                        peerName: peerName,
+                        onAccept: { peerConnect.respondToInvitation(accept: true) },
+                        onDecline: { peerConnect.respondToInvitation(accept: false) }
+                    )
+                }
+
+                if showsConnectionSuccess {
+                    PeerConnectedPopup(
+                        peerName: peerConnect.connectedPeerName ?? "상대 디바이스",
+                        onDismiss: { showsConnectionSuccess = false }
+                    )
+                }
+            }
+            .overlayPreferenceValue(BPMButtonBoundsPreferenceKey.self) { buttonAnchor in
+                RootBPMPopover(
+                    buttonAnchor: buttonAnchor,
+                    viewModel: prototypeViewModel,
+                    peer: peerConnect,
+                    tutorial: tutorial
+                )
             }
         }
         .environmentObject(router)
@@ -66,6 +109,10 @@ struct AppRootView: View {
             syncPrototype(to: router.currentRoute)
             updateIdleTimer(for: router.currentRoute)
             startTutorialIfEligible(on: router.currentRoute)
+            if DeviceInfoProvider.currentDeviceType == .iPad,
+               !peerConnect.hasCustomDisplayName {
+                showsDeviceNamePrompt = true
+            }
         }
         .onChange(of: prototypeViewModel.screen) { _, screen in
             switch screen {
@@ -85,7 +132,21 @@ struct AppRootView: View {
         }
         // iPad 연결·스트로크 패턴 선택 단계 검증.
         .onChange(of: peerConnect.isConnected) { _, connected in
-            if connected { tutorial.handle(.connected) }
+            if connected {
+                tutorial.handle(.connected)
+                showsConnectionSuccess = true
+                applyConnectedRole(peerConnect.role)
+                startConnectedSongTutorialIfEligible()
+            } else {
+                showsConnectionSuccess = false
+                router.returnHome()
+                startTutorialIfEligible(on: router.currentRoute)
+            }
+        }
+        .onChange(of: peerConnect.role) { _, role in
+            guard peerConnect.isConnected else { return }
+            applyConnectedRole(role)
+            startConnectedSongTutorialIfEligible()
         }
         // 연결된 iPad가 튕기면 → iPhone 튜토리얼 마지막 단계(“iPad로 치기”)를 완료 대기 상태로.
         .onChange(of: peerConnect.remoteStrumTick) { _, _ in
@@ -93,6 +154,22 @@ struct AppRootView: View {
         }
         .onChange(of: strumSelect.selectedID) { _, id in
             if id != nil { tutorial.handle(.patternSelected) }
+        }
+        .onChange(of: peerConnect.sharedSongSelectionTick) { _, _ in
+            guard peerConnect.isConnected,
+                  peerConnect.role == .strumming,
+                  let title = peerConnect.sharedSongTitle,
+                  let song = PracticeSongData.songs.first(where: { $0.title == title })
+            else { return }
+
+            selectedDrillSong = song
+            selectedDrillMode = .strum
+            router.replaceRoot(with: .chordDrill)
+        }
+        .onChange(of: peerConnect.pendingInvitationPeerName) { _, peerName in
+            if peerName != nil {
+                prototypeViewModel.showBPM = false
+            }
         }
     }
 
@@ -106,6 +183,9 @@ struct AppRootView: View {
     /// 영원히 멈춘다) — iPhone에서 온보딩을 마친 뒤에만 시작한다.
     private func startTutorialIfEligible(on route: AppRoute) {
         guard supportsTutorial, route != .onboarding else { return }
+        if route == .neck, !peerConnect.isConnected {
+            tutorial.startIPhoneTutorialAfterConnectionIfNeeded()
+        }
         tutorial.startIfNeeded()
     }
 
@@ -130,7 +210,16 @@ struct AppRootView: View {
     private var screen: some View {
         switch router.currentRoute {
         case .onboarding:
-            OnboardingScreen()
+            OnboardingScreen { path in
+                switch path {
+                case .iPhone:
+                    tutorial.prepare(for: .iPhone)
+                    router.completeOnboarding(startingAt: .neck)
+                case .iPadConnection:
+                    router.completeOnboarding(startingAt: .neck)
+                    beginConnectionTutorial()
+                }
+            }
 
         case .neck, .strum:
             // ⚠️ 임시 — 넥과 스트럼이 아직 프로토타입 한 화면에 같이 들어 있다.
@@ -147,7 +236,11 @@ struct AppRootView: View {
                 selectedProgression: progression.select.selectedProgression,
                 // 처음이면 가이드부터, 봤으면 바로 기기 찾기로. (SPEC 플로우3)
                 onPeerConnect: {
-                    router.navigate(to: peerConnect.shouldShowGuide ? .peerGuide : .peerBrowse)
+                    if tutorial.shouldOfferConnectionTutorial {
+                        beginConnectionTutorial()
+                        return false
+                    }
+                    return true
                 },
                 // 모드 토글이 **라우터 route까지** 바꾼다 — 그래야 선택·뒤로가기가 그 모드로 돌아온다.
                 onModeChange: { mode in
@@ -156,8 +249,11 @@ struct AppRootView: View {
                     router.replaceRoot(with: route)
                     tutorial.handle(.navigated(route))   // 튜토리얼: 스트로크 모드 이동 직접 검증
                 },
-                // 넥(모드 A)에서 코드 드릴 연습으로 진입 — 먼저 노래를 고른다.
-                onStartDrill: { router.navigate(to: .chordDrillSongSelect) },
+                // 노래 드릴 연습으로 진입 — 현재 코드/스트로크 모드를 기억한 뒤 곡을 고른다.
+                onStartDrill: {
+                    selectedDrillMode = peerConnect.isConnected ? .chord : prototypeViewModel.mode
+                    router.navigate(to: .chordDrillSongSelect)
+                },
                 // 튜토리얼: 넥 목표 코드 표시 + 짚기·튕기기 동작 검증.
                 tutorial: supportsTutorial ? tutorial : nil
             )
@@ -168,12 +264,22 @@ struct AppRootView: View {
                 onBack: router.back,
                 onSelect: { song in
                     selectedDrillSong = song
+                    if peerConnect.isConnected {
+                        guard peerConnect.role == .fingering else { return }
+                        selectedDrillMode = .chord
+                        peerConnect.selectSharedSong(title: song.title)
+                    }
+                    tutorial.handle(.songSelected)
                     router.navigate(to: .chordDrill)
                 }
             )
 
         case .chordDrill:
-            ChordDrillScreen(song: selectedDrillSong ?? PracticeSongData.songs[0])
+            ChordDrillScreen(
+                song: selectedDrillSong ?? PracticeSongData.songs[0],
+                mode: selectedDrillMode,
+                peer: peerConnect
+            )
 
         case .strokeSelect:
             StrumSelectScreen(
@@ -203,6 +309,67 @@ struct AppRootView: View {
 
         case .peerBrowse:
             PeerBrowseScreen(viewModel: peerConnect)
+        }
+    }
+
+    private func beginConnectionTutorial() {
+        if !peerConnect.hasCustomDisplayName {
+            startsConnectionTutorialAfterNaming = true
+            showsDeviceNamePrompt = true
+        } else {
+            tutorial.startConnectionTutorial()
+        }
+    }
+
+    private func applyConnectedRole(_ role: PeerHandRole) {
+        let route: AppRoute = role == .fingering ? .neck : .strum
+        router.replaceRoot(with: route)
+    }
+
+    private func startConnectedSongTutorialIfEligible() {
+        tutorial.startConnectedSongTutorialIfNeeded(
+            isRequester: peerConnect.isConnectionRequester && peerConnect.role == .fingering
+        )
+    }
+}
+
+private struct RootBPMPopover: View {
+    @Environment(\.landscapeStageSafeAreaInsets) private var stageSafeArea
+
+    let buttonAnchor: Anchor<CGRect>?
+    @ObservedObject var viewModel: ScreenshotPrototypeViewModel
+    @ObservedObject var peer: PeerConnectViewModel
+    @ObservedObject var tutorial: TutorialController
+
+    var body: some View {
+        if viewModel.showBPM,
+           viewModel.isControlBarExpanded,
+           !viewModel.isPlaying,
+           !peer.isConnected,
+           let buttonAnchor {
+            GeometryReader { proxy in
+                let buttonFrame = proxy[buttonAnchor]
+                let popoverWidth: CGFloat = 365
+                let desiredX = buttonFrame.midX - popoverWidth / 2
+                let popoverX = min(
+                    max(stageSafeArea.leading, desiredX),
+                    proxy.size.width - stageSafeArea.trailing - popoverWidth
+                )
+                let arrowOffset = buttonFrame.midX - (popoverX + popoverWidth / 2)
+
+                BPMPopover(
+                    bpm: $viewModel.bpm,
+                    arrowOffsetX: arrowOffset,
+                    highlightsNumber: tutorial.highlightTarget == .bpmNumber,
+                    onCommit: { value in
+                        tutorial.handle(.bpmCommitted(Int(value.rounded())))
+                    },
+                    onDismiss: {
+                        viewModel.showBPM = false
+                    }
+                )
+                .offset(x: popoverX, y: buttonFrame.maxY + 12)
+            }
         }
     }
 }
