@@ -8,6 +8,16 @@ struct PeerButtonBoundsPreferenceKey: PreferenceKey {
     }
 }
 
+/// 상단 컨트롤 바가 **실제로 차지하는 크기**. 버튼은 오른쪽 끝에 붙어 있고 펼침 여부에 따라
+/// 폭이 크게 달라지는데, 이걸 재야 나머지 넓은 빈 자리를 악기 터치에 돌려줄 수 있다.
+struct TopControlBarContentSizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGSize?
+
+    static func reduce(value: inout CGSize?, nextValue: () -> CGSize?) {
+        value = nextValue() ?? value
+    }
+}
+
 struct BPMButtonBoundsPreferenceKey: PreferenceKey {
     static var defaultValue: Anchor<CGRect>?
 
@@ -116,6 +126,16 @@ struct TopControlBar: View {
                 withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                     onToggleControls()
                 }
+            }
+        }
+        // 버튼 줄의 실제 크기를 재서 알린다. 바깥 `.frame(maxWidth:)`보다 **먼저** 재야
+        // 화면 전체 폭이 아니라 버튼이 실제로 덮는 만큼만 잡힌다.
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: TopControlBarContentSizePreferenceKey.self,
+                    value: proxy.size
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .topTrailing)

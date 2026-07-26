@@ -16,6 +16,8 @@ struct MainInstrumentScreen: View {
     @StateObject private var strumProgression = ChordProgressionPlayer()
     @State private var isPeerPopoverPresented = false
     @State private var isNeckPositionExpanded = false
+    /// 상단 버튼 줄이 실제로 덮는 크기. 이만큼만 악기 터치에서 제외한다.
+    @State private var topControlBarContentSize: CGSize?
     @AppStorage("usesCompactNeckLayout") private var usesCompactNeckLayout = false
 
     /// 스트로크 선택(U4)에서 고른 주법. 재생 시 자동 스트럼이 이걸 긁는다.
@@ -99,6 +101,9 @@ struct MainInstrumentScreen: View {
             .padding(.trailing, stageSafeArea.trailing)
             // 기타의 전체 화면 UIKit 멀티터치 레이어보다 항상 위에서 버튼 입력을 받는다.
             .zIndex(10)
+            .onPreferenceChange(TopControlBarContentSizePreferenceKey.self) { size in
+                topControlBarContentSize = size
+            }
 
             #if DEBUG
             if viewModel.mode == .strum {
@@ -202,15 +207,30 @@ struct MainInstrumentScreen: View {
             : [topControlBarRegion]
     }
 
-    /// UIKit 멀티터치 레이어가 SwiftUI 상단 버튼을 가로채지 않도록 현재 도화지 전체 폭을 제외한다.
-    /// iPad 스트럼은 1366pt 도화지를 쓰므로 아이폰용 고정 x 좌표로는 우측 버튼을 보호할 수 없다.
+    /// UIKit 멀티터치 레이어가 SwiftUI 상단 버튼을 가로채지 않도록 버튼 줄을 제외한다.
+    ///
+    /// 예전엔 도화지 전체 폭을 통째로 뺐다. 고정 x 좌표로는 1366pt 도화지(iPad 스트럼)의 우측
+    /// 버튼을 보호할 수 없어서였는데, 그 대가로 **줄 위쪽 여백까지 전부 죽었다** — 버튼은 오른쪽
+    /// 끝에만 붙어 있는데 왼쪽 빈 자리에서도 스트로크를 시작할 수 없었다.
+    /// 이제 버튼 줄의 실제 크기를 재서 그만큼만 뺀다. 접으면 제외 영역도 함께 줄어든다.
     private var topControlBarRegion: CGRect {
         let topPadding = max(12, stageSafeArea.top - 4)
+
+        // 아직 못 쟀으면 예전처럼 전체 폭을 지켜 버튼을 놓치지 않는다.
+        guard let contentSize = topControlBarContentSize else {
+            return CGRect(x: 0, y: 0, width: stageReferenceWidth, height: topPadding + 54)
+        }
+
+        // 버튼 줄은 오른쪽(trailing) 끝에 붙는다. 손가락 굵기만큼 여유를 두고 감싼다.
+        let slop: CGFloat = 8
+        let width = min(contentSize.width + slop * 2, stageReferenceWidth)
+        let minX = stageReferenceWidth - stageSafeArea.trailing - contentSize.width - slop
+
         return CGRect(
-            x: 0,
+            x: max(0, minX),
             y: 0,
-            width: stageReferenceWidth,
-            height: topPadding + 54
+            width: width,
+            height: topPadding + contentSize.height + slop
         )
     }
 
