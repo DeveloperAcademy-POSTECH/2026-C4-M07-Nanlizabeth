@@ -160,7 +160,15 @@ final class TutorialController: ObservableObject {
         return "\(step.message)  \(matchedActionCount) / \(step.requiredMatchCount)"
     }
     var celebrationButtonTitle: String { flow == .iPhone ? "다음" : "시작하기" }
+    var celebrationTitle: String { flow == .iPadConnection ? "Connected" : "Tutorial Complete" }
+    var celebrationMessage: String {
+        flow == .iPadConnection
+            ? "연결됐어요, 축하드려요! 이제 두 디바이스로 함께 연주할 수 있어요."
+            : "멋지게 첫 연주를 완성했어요!"
+    }
     var isConnectionTutorial: Bool { flow == .iPadConnection && isOverlayVisible }
+    /// 연결 튜토리얼의 축하 화면이 떠 있는 동안엔 일반 연결 완료 팝업이 겹치지 않게 한다.
+    var showsConnectionCelebration: Bool { flow == .iPadConnection && isCelebrating }
     var keepsBPMKeypadClear: Bool {
         flow == .iPhone && isRunning && stepIndex == 5
     }
@@ -263,6 +271,14 @@ final class TutorialController: ObservableObject {
 
     /// 실제 화면이 동작을 알려온다. 현재 단계와 맞는 동작만 횟수에 반영한다.
     func handle(_ event: TutorialEvent) {
+        // 연결은 **내가 목록에서 고르는 길**과 **상대가 부르고 내가 수락하는 길** 두 가지다.
+        // 수락하는 쪽에는 `.peerSelected`가 없어 4단계에서 멈추는데, 그때 팝오버까지 닫혀
+        // 되살릴 방법이 없었다. 연결됐다는 사실 하나로 어느 단계에서든 끝맺는다.
+        if flow == .iPadConnection, phase == .running, case .connected = event {
+            completeConnectionTutorial()
+            return
+        }
+
         guard phase == .running, let step = currentStep, step.matches(event) else { return }
 
         matchedActionCount += 1
@@ -354,6 +370,18 @@ final class TutorialController: ObservableObject {
         showsSuccessBorder = false
         showsChordConfetti = false
         phase = .finished
+    }
+
+    /// 연결이 성사되면 마지막 단계까지 채운 뒤 축하 화면으로 넘어간다.
+    /// (단계 표시가 4/5에서 멈춘 채 끝나 보이지 않도록 5/5를 거쳐 간다.)
+    private func completeConnectionTutorial() {
+        stepIndex = max(0, steps.count - 1)
+        matchedActionCount = 0
+        lastActionDone = false
+        showsSuccessBorder = false
+        showsChordConfetti = false
+        phase = .celebrating
+        HapticsManager.impact()
     }
 
     private func advance() {
@@ -487,10 +515,10 @@ final class TutorialController: ObservableObject {
                 message: "목록에서 연결할 디바이스 이름을 찾아 눌러주세요.",
                 matches: { if case .peerSelected = $0 { return true }; return false }
             ),
+            // 연결 성사는 `handle`이 흐름 전체에서 가로채 축하 화면으로 보낸다.
             TutorialStep(
                 message: "연결을 하고 있어요. 두 디바이스를 가까이 유지해주세요.",
-                matches: { if case .connected = $0 { return true }; return false },
-                finishesOnMatch: true
+                matches: { if case .connected = $0 { return true }; return false }
             ),
         ]
     }

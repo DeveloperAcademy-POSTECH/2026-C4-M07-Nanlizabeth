@@ -134,7 +134,8 @@ struct AppRootView: View {
         .onChange(of: peerConnect.isConnected) { _, connected in
             if connected {
                 tutorial.handle(.connected)
-                showsConnectionSuccess = true
+                // 연결 튜토리얼 중이면 축하 화면이 같은 소식을 전하므로 팝업은 띄우지 않는다.
+                showsConnectionSuccess = !tutorial.showsConnectionCelebration
                 applyConnectedRole(peerConnect.role)
                 startConnectedSongTutorialIfEligible()
             } else {

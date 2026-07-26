@@ -86,7 +86,7 @@ struct TutorialOverlay: View {
     // MARK: 내용
 
     private var headerText: String {
-        if tutorial.isCelebrating { return "Tutorial Complete" }
+        if tutorial.isCelebrating { return tutorial.celebrationTitle }
         if tutorial.isReadyToEnjoy { return "Ready" }
         if tutorial.isConnectionTutorial {
             return "디바이스 연결해보기 · \(tutorial.displayStepNumber) / \(tutorial.displayTotalSteps)"
@@ -96,7 +96,7 @@ struct TutorialOverlay: View {
 
     private var bodyText: String {
         if tutorial.isCelebrating {
-            return "멋지게 첫 연주를 완성했어요!"
+            return tutorial.celebrationMessage
         }
         if tutorial.isReadyToEnjoy {
             return "노래 목록에서 원하는 곡을 골라 마음껏 즐겨보세요!"
@@ -109,7 +109,8 @@ struct TutorialOverlay: View {
     }
 
     @ViewBuilder private var tutorialControl: some View {
-        if tutorial.isConnectionTutorial {
+        // 축하 화면에선 "시작하기"가 끝맺으므로 종료 버튼을 함께 두지 않는다.
+        if tutorial.isConnectionTutorial, tutorial.isRunning {
             tutorialControlButton("튜토리얼 종료") {
                 tutorial.endConnectionTutorial()
             }
